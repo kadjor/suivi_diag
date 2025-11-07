@@ -1,0 +1,49 @@
+# Configuration sensible
+config/database.php
+
+# Logs
+logs/*.log
+!logs/.gitkeep
+
+# Uploads
+public/uploads/*
+!public/uploads/.gitkeep
+!public/uploads/reports/.gitkeep
+!public/uploads/attachments/.gitkeep
+!public/uploads/acknowledgments/.gitkeep
+!public/uploads/imports/.gitkeep
+!public/uploads/temp/.gitkeep
+
+# Cache et sessions
+cache/*
+!cache/.gitkeep
+sessions/*
+!sessions/.gitkeep
+
+# Fichiers système
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Composer (si utilisé ultérieurement)
+/vendor/
+composer.lock
+
+# NPM (si utilisé ultérieurement)
+node_modules/
+package-lock.json
+
+# Fichiers temporaires
+tmp/*
+!tmp/.gitkeep
+*.tmp
+
+# Backups
+backups/*
+!backups/.gitkeep
+*.sql
+*.sql.gz
