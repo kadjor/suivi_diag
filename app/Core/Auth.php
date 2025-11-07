@@ -92,7 +92,7 @@ class Auth
     /**
      * Tente d'authentifier un utilisateur
      */
-    public static function attempt($username, $password)
+    public static function attempt($username, $password, $remember = false)
     {
         $userModel = new \Models\User();
         $user = $userModel->whereOne(['username' => $username]);
@@ -119,8 +119,10 @@ class Auth
             return false;
         }
 
-        // Connexion réussie
-        return $user;
+        // Connexion réussie - mettre en session
+        self::login($user, $remember);
+
+        return true;
     }
 
     /**
