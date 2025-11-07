@@ -55,4 +55,21 @@ class Site extends Model
 
         return $this->query($sql, $params);
     }
+
+    /**
+     * Récupère les sites d'un client
+     */
+    public function getByClient($clientId)
+    {
+        $sql = "SELECT s.*,
+                COUNT(DISTINCT d.id) as diagnostics_count,
+                MAX(d.date) as last_diagnostic_date
+                FROM sites s
+                LEFT JOIN diagnostics d ON s.id = d.site_id
+                WHERE s.client_id = ?
+                GROUP BY s.id
+                ORDER BY s.name";
+
+        return $this->query($sql, [$clientId]);
+    }
 }
