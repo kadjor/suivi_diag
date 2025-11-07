@@ -27,7 +27,14 @@ class Auth
         // Cache l'utilisateur dans la session pour éviter les requêtes multiples
         if (!isset($_SESSION['user_data'])) {
             $userModel = new \Models\User();
-            $_SESSION['user_data'] = $userModel->find($_SESSION['user_id']);
+            $user = $userModel->queryOne(
+                "SELECT u.*, r.name as role_name, r.label as role_label, r.permissions as role_permissions
+                 FROM users u
+                 LEFT JOIN roles r ON u.role_id = r.id
+                 WHERE u.id = ?",
+                [$_SESSION['user_id']]
+            );
+            $_SESSION['user_data'] = $user;
         }
 
         return $_SESSION['user_data'];
@@ -95,7 +102,13 @@ class Auth
     public static function attempt($username, $password, $remember = false)
     {
         $userModel = new \Models\User();
-        $user = $userModel->whereOne(['username' => $username]);
+        $user = $userModel->queryOne(
+            "SELECT u.*, r.name as role_name, r.label as role_label, r.permissions as role_permissions
+             FROM users u
+             LEFT JOIN roles r ON u.role_id = r.id
+             WHERE u.username = ?",
+            [$username]
+        );
 
         if (!$user) {
             self::logAudit('login', null, null, 'failure');

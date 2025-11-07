@@ -30,14 +30,14 @@ class DashboardController extends Controller
     {
         $user = Auth::user();
 
-        switch ($user['role_slug']) {
+        switch ($user['role_name']) {
             case 'admin':
                 $this->adminDashboard();
                 break;
-            case 'secretary':
+            case 'secretariat':
                 $this->secretaryDashboard();
                 break;
-            case 'technician':
+            case 'technicien':
                 $this->technicianDashboard();
                 break;
             case 'client':
