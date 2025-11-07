@@ -133,6 +133,10 @@ switch ($step) {
         }
 
         try {
+            // Configuration pour compatibilité MariaDB
+            $pdo->exec("SET sql_mode = ''");
+            $pdo->exec("SET FOREIGN_KEY_CHECKS = 0");
+
             // Lire le fichier SQL
             $sql = file_get_contents($schema_file);
 
@@ -142,6 +146,9 @@ switch ($step) {
 
             // Exécuter le SQL
             $pdo->exec($sql);
+
+            // Réactiver les contraintes
+            $pdo->exec("SET FOREIGN_KEY_CHECKS = 1");
 
             // Compter les tables créées
             $stmt = $pdo->query("SHOW TABLES");
@@ -181,6 +188,10 @@ switch ($step) {
         }
 
         try {
+            // Configuration pour compatibilité MariaDB
+            $pdo->exec("SET sql_mode = ''");
+            $pdo->exec("SET FOREIGN_KEY_CHECKS = 0");
+
             // Lire le fichier SQL
             $sql = file_get_contents($seeds_file);
 
@@ -190,6 +201,9 @@ switch ($step) {
 
             // Exécuter le SQL
             $pdo->exec($sql);
+
+            // Réactiver les contraintes
+            $pdo->exec("SET FOREIGN_KEY_CHECKS = 1");
 
             // Compter les utilisateurs créés
             $stmt = $pdo->query("SELECT COUNT(*) as count FROM users");

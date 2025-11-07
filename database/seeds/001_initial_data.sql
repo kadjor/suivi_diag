@@ -4,6 +4,7 @@
 -- =================================================================
 
 SET NAMES utf8mb4;
+SET sql_mode = '';
 
 -- =================================================================
 -- ROLES
@@ -258,7 +259,7 @@ INSERT INTO `messages` (`order_id`, `user_id`, `recipient_id`, `content`, `requi
 INSERT INTO `appointments` (`order_id`, `intervention_id`, `technician_id`, `site_id`, `title`, `start_datetime`, `end_datetime`, `location`, `status`, `created_by`) VALUES
 (1, 1, 4, 1, 'DTA Bâtiment A', '2024-01-22 09:00:00', '2024-01-22 17:00:00', '15 Rue de Rivoli, 75001 Paris', 'completed', 2),
 (2, 2, 5, 2, 'RAAT Immeuble Opéra', '2024-02-28 08:30:00', '2024-03-01 16:00:00', '8 Boulevard des Capucines, 75009 Paris', 'completed', 2),
-(3, 3, 6, 3, 'Multi-diagnostics Tour Montparnasse', '2024-03-12 09:00:00', '2024-03-13 17:00:00', '25 Avenue du Maine, 75015 Paris', 'in_progress', 2),
+(3, 3, 6, 3, 'Multi-diagnostics Tour Montparnasse', '2024-03-12 09:00:00', '2024-03-13 17:00:00', '25 Avenue du Maine, 75015 Paris', 'confirmed', 2),
 (4, 4, 4, 4, 'DPE Résidence Les Lilas', '2024-03-18 14:00:00', '2024-03-18 17:00:00', '45 Avenue Gambetta, 75020 Paris', 'scheduled', 2);
 
 -- =================================================================
