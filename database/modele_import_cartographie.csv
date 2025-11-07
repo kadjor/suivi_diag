@@ -1,0 +1,6 @@
+reference_site,nom_site,adresse,code_postal,ville,type_diagnostic,date_diagnostic,statut,criticite,numero_rapport,validite_jusqu_au,observations
+PCH-BAT-006,Immeuble Exemple 1,10 Rue de la Paix,75002,Paris,DTA,15/01/2024,ok,0,DIAG-2024-0100,15/01/2027,Aucune anomalie détectée
+PCH-BAT-007,Bâtiment Test 2,25 Avenue Victor Hugo,69003,Lyon,DAPP,20/02/2024,anomaly,2,DIAG-2024-0101,20/02/2027,Présence amiante niveau 2 - Dalles de sol
+PCH-BAT-008,Site Démo 3,45 Boulevard Gambetta,33000,Bordeaux,RAAT,10/03/2024,critical,4,DIAG-2024-0102,10/06/2024,Présence amiante friable - Flocage plafond
+PCH-BAT-009,Résidence Exemple 4,12 Rue Jean Jaurès,75019,Paris,DTA,05/02/2024,ok,0,DIAG-2024-0103,05/02/2027,RAS
+PCH-BAT-010,Centre Commercial 5,88 Cours de la Libération,38000,Grenoble,RAAD,28/03/2024,anomaly,3,DIAG-2024-0104,28/06/2024,Amiante présent - Démolition contrôlée requise
