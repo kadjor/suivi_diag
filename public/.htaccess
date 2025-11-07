@@ -46,9 +46,14 @@ Options -Indexes
     ExpiresByType application/javascript "access plus 1 month"
 </IfModule>
 
-# Limite taille upload (ajuster selon php.ini)
-php_value upload_max_filesize 20M
-php_value post_max_size 20M
-php_value max_execution_time 300
-php_value max_input_time 300
-php_value memory_limit 256M
+# Configuration PHP
+# Note : php_value ne fonctionne qu'avec mod_php (Apache Module)
+# Si vous utilisez PHP-FPM/FastCGI, créez un fichier .user.ini à la racine
+# avec les valeurs suivantes :
+#   upload_max_filesize = 20M
+#   post_max_size = 20M
+#   max_execution_time = 300
+#   max_input_time = 300
+#   memory_limit = 256M
+#
+# Ou configurez ces valeurs dans votre php.ini (Virtualmin : Edit PHP Configuration)

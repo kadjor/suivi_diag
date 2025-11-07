@@ -53,10 +53,11 @@ Mot de passe pour tous : **`Demo2024!`**
 Après installation, consultez :
 
 1. **QUICK_START.md** : Configuration rapide (email, permissions)
-2. **docs/INSTALL.md** : Guide complet Virtualmin (20 pages)
-3. **COMPTES_DEMO.md** : Scénarios de test détaillés
-4. **README.md** : Vue d'ensemble complète des fonctionnalités
-5. **LIVRABLE_COMPLET.md** : Liste exhaustive de ce qui est livré
+2. **PERMISSIONS.md** : Guide complet chmod/chown + dépannage 🔑
+3. **docs/INSTALL.md** : Guide complet Virtualmin (20 pages)
+4. **COMPTES_DEMO.md** : Scénarios de test détaillés
+5. **README.md** : Vue d'ensemble complète des fonctionnalités
+6. **LIVRABLE_COMPLET.md** : Liste exhaustive de ce qui est livré
 
 ---
 
@@ -156,11 +157,26 @@ Document Root: /home/username/public_html/suivi-diag/public
 
 ## ❓ Problèmes ?
 
-### Erreur 500
+### Erreur 500 - "Invalid command 'php_value'"
+Votre serveur utilise **PHP-FPM/FastCGI** (c'est normal sur Virtualmin).
+
+✅ **Solution** : Le fichier `public/.user.ini` a été créé automatiquement.
+
+Si besoin, configurez PHP via Virtualmin :
+- Webmin → Servers → Apache → **Edit PHP Configuration**
+- Ajoutez les valeurs : `upload_max_filesize = 20M`, `post_max_size = 20M`
+
+### Erreur 500 - Permissions
 ```bash
-tail -f logs/error.log  # Voir les erreurs
-chmod 770 logs public/uploads -R  # Corriger permissions
+# Voir les erreurs
+tail -f logs/error.log
+
+# Corriger les permissions
+chmod 770 logs cache sessions tmp backups public/uploads -R
+chown -R username:username .
 ```
+
+📖 **Guide complet** : Consultez **PERMISSIONS.md**
 
 ### Base de données inaccessible
 - Vérifiez `config/database.php`

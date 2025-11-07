@@ -66,6 +66,7 @@ Accédez à : `https://votredomaine.com`
 ## 📚 Documentation complète
 
 - **README.md** : vue d'ensemble complète
+- **PERMISSIONS.md** : guide complet des permissions (chmod, chown, dépannage) 🔑
 - **docs/INSTALL.md** : guide d'installation détaillé Virtualmin
 - **COMPTES_DEMO.md** : tous les comptes de test
 - **SPECIFICATION_TECHNIQUE.md** : architecture, modèle données
@@ -125,14 +126,26 @@ Vérifiez que `.htaccess` est actif :
 - Vérifier `mod_rewrite` activé
 - S'assurer que `AllowOverride All` dans la config VirtualHost
 
-### Permissions fichiers
+### Permissions fichiers ⚠️ IMPORTANT
+
+**Commandes complètes** (depuis la racine de l'application) :
 
 ```bash
-chmod 770 logs
-chmod 770 public/uploads -R
+# Dossiers d'écriture (770 = rwxrwx---)
+chmod 770 logs cache sessions tmp backups
+chmod 770 public/uploads
+find public/uploads -type d -exec chmod 770 {} \;
+
+# Fichiers de configuration sensibles (640 = rw-r-----)
+chmod 640 config/database.php config/app.php config/settings.php
+
+# Propriétaire (remplacer 'username' par votre utilisateur)
+chown -R username:username .
 ```
 
-Ou via Virtualmin File Manager : clic droit → Change Permissions
+📖 **Guide complet** : Consultez **PERMISSIONS.md** pour toutes les commandes, le script automatisé, et le dépannage des erreurs de permissions.
+
+💡 Via Virtualmin File Manager : clic droit → Change Permissions
 
 ## 🧪 Tester le système
 
@@ -172,12 +185,23 @@ Ou via Virtualmin File Manager : clic droit → Change Permissions
 
 ### Erreur 500
 
+**1. Erreur "Invalid command 'php_value'" dans .htaccess**
+
+Votre serveur utilise PHP-FPM/FastCGI. Le fichier `.user.ini` a été créé automatiquement.
+
+Si le problème persiste, configurez PHP dans Virtualmin :
+- Webmin → Servers → Apache → Edit PHP Configuration
+- Ajoutez : `upload_max_filesize = 20M`, `post_max_size = 20M`, `memory_limit = 256M`
+
+**2. Erreur de permissions**
+
 ```bash
 # Vérifier logs :
 tail -f logs/error.log
 
-# Corriger permissions :
-chmod 770 logs public/uploads -R
+# Corriger permissions (voir PERMISSIONS.md) :
+chmod 770 logs cache sessions tmp backups public/uploads -R
+chown -R username:username .
 ```
 
 ### Base de données inaccessible
