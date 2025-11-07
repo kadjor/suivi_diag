@@ -47,3 +47,8 @@ backups/*
 !backups/.gitkeep
 *.sql
 *.sql.gz
+
+# Exceptions : Autoriser les fichiers SQL de la base de données
+!database/schema.sql
+!database/seeds/*.sql
+!database/migrations/*.sql
