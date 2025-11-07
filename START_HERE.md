@@ -53,11 +53,12 @@ Mot de passe pour tous : **`Demo2024!`**
 Après installation, consultez :
 
 1. **QUICK_START.md** : Configuration rapide (email, permissions)
-2. **PERMISSIONS.md** : Guide complet chmod/chown + dépannage 🔑
-3. **docs/INSTALL.md** : Guide complet Virtualmin (20 pages)
-4. **COMPTES_DEMO.md** : Scénarios de test détaillés
-5. **README.md** : Vue d'ensemble complète des fonctionnalités
-6. **LIVRABLE_COMPLET.md** : Liste exhaustive de ce qui est livré
+2. **TROUBLESHOOTING.md** : 🚨 Dépannage 403/404 Forbidden + solutions 🔑
+3. **PERMISSIONS.md** : Guide complet chmod/chown + permissions
+4. **docs/INSTALL.md** : Guide complet Virtualmin (20 pages)
+5. **COMPTES_DEMO.md** : Scénarios de test détaillés
+6. **README.md** : Vue d'ensemble complète des fonctionnalités
+7. **LIVRABLE_COMPLET.md** : Liste exhaustive de ce qui est livré
 
 ---
 
@@ -157,6 +158,35 @@ Document Root: /home/username/public_html/suivi-diag/public
 
 ## ❓ Problèmes ?
 
+### 🔴 Erreur 403 "Forbidden" ou 404 "Route non trouvée"
+
+**Symptômes** :
+- `https://votre-domaine.com/` → **403 Forbidden**
+- `https://votre-domaine.com/public/index.php` → **404 Route non trouvée**
+
+**Causes** :
+1. ❌ Document Root ne pointe pas vers `/public`
+2. ❌ Fichiers uploadés en root (mauvais propriétaire)
+
+**✅ Solution rapide** :
+
+```bash
+# 1. Corriger le propriétaire (en tant que root)
+cd /home/gestion/public_html
+chown -R gestion:gestion .
+
+# 2. Utiliser le script automatique
+sudo bash fix-installation.sh
+
+# 3. Configurer le Document Root dans Virtualmin
+#    Server Configuration → Website Options
+#    Document Root: /home/gestion/public_html/public
+```
+
+📖 **Guide complet** : Consultez **TROUBLESHOOTING.md** pour la solution détaillée
+
+---
+
 ### Erreur 500 - "Invalid command 'php_value'"
 Votre serveur utilise **PHP-FPM/FastCGI** (c'est normal sur Virtualmin).
 
@@ -168,10 +198,10 @@ Si besoin, configurez PHP via Virtualmin :
 
 ### Erreur 500 - Permissions
 ```bash
-# Voir les erreurs
-tail -f logs/error.log
+# Script automatique (recommandé)
+sudo bash fix-installation.sh
 
-# Corriger les permissions
+# Ou manuellement
 chmod 770 logs cache sessions tmp backups public/uploads -R
 chown -R username:username .
 ```
@@ -186,7 +216,7 @@ chown -R username:username .
 - Document Root doit pointer vers `/public`
 - Vérifiez que `mod_rewrite` est actif
 
-**Plus de solutions** : consultez `docs/INSTALL.md` section Dépannage
+**Plus de solutions** : consultez **TROUBLESHOOTING.md** et `docs/INSTALL.md`
 
 ---
 
