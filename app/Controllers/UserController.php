@@ -162,7 +162,7 @@ class UserController extends Controller
             $userId = $this->userModel->create([
                 'username' => $data['username'],
                 'email' => $data['email'],
-                'password' => password_hash($data['password'], PASSWORD_DEFAULT),
+                'password_hash' => password_hash($data['password'], PASSWORD_DEFAULT),
                 'first_name' => $data['first_name'],
                 'last_name' => $data['last_name'],
                 'role_id' => $data['role_id'],
@@ -259,7 +259,7 @@ class UserController extends Controller
 
             // Mise à jour du mot de passe seulement si fourni
             if (!empty($data['password'])) {
-                $updateData['password'] = password_hash($data['password'], PASSWORD_DEFAULT);
+                $updateData['password_hash'] = password_hash($data['password'], PASSWORD_DEFAULT);
             }
 
             $this->userModel->update($id, $updateData);

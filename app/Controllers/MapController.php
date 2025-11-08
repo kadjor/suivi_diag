@@ -35,10 +35,9 @@ class MapController extends Controller
             // Clients : seulement leur patrimoine
             $sites = $this->siteModel->query(
                 "SELECT s.*, c.organization_name as client_name,
-                       COUNT(DISTINCT o.id) as orders_count
+                       (SELECT COUNT(*) FROM orders o WHERE o.client_id = s.client_id) as orders_count
                 FROM sites s
                 LEFT JOIN clients c ON s.client_id = c.id
-                LEFT JOIN orders o ON o.site_id = s.id
                 WHERE s.client_id = ? AND s.latitude IS NOT NULL AND s.longitude IS NOT NULL
                 GROUP BY s.id",
                 [$user['client_id']]
@@ -47,10 +46,9 @@ class MapController extends Controller
             // Admins, secrétaires, techniciens : tous les sites
             $sites = $this->siteModel->query(
                 "SELECT s.*, c.organization_name as client_name,
-                       COUNT(DISTINCT o.id) as orders_count
+                       (SELECT COUNT(*) FROM orders o WHERE o.client_id = s.client_id) as orders_count
                 FROM sites s
                 LEFT JOIN clients c ON s.client_id = c.id
-                LEFT JOIN orders o ON o.site_id = s.id
                 WHERE s.latitude IS NOT NULL AND s.longitude IS NOT NULL
                 GROUP BY s.id"
             );
@@ -78,16 +76,17 @@ class MapController extends Controller
         $user = Auth::user();
 
         // Formule Haversine pour calculer la distance
+        // On utilise les sites du client de chaque commande
         $sql = "SELECT o.*, s.name as site_name, s.address, s.latitude, s.longitude,
                        c.organization_name as client_name,
                        st.label as status_label, st.color as status_color,
-                       (6371 * acos(cos(radians(?)) * cos(radians(s.latitude)) * 
-                       cos(radians(s.longitude) - radians(?)) + 
+                       (6371 * acos(cos(radians(?)) * cos(radians(s.latitude)) *
+                       cos(radians(s.longitude) - radians(?)) +
                        sin(radians(?)) * sin(radians(s.latitude)))) AS distance
                 FROM orders o
-                LEFT JOIN sites s ON o.site_id = s.id
                 LEFT JOIN clients c ON o.client_id = c.id
-                LEFT JOIN statuses st ON o.status = st.code
+                LEFT JOIN sites s ON s.client_id = c.id
+                LEFT JOIN statuses st ON o.status_id = st.id
                 WHERE s.latitude IS NOT NULL AND s.longitude IS NOT NULL";
 
         $params = [$lat, $lng, $lat];

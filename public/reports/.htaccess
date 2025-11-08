@@ -1,0 +1,7 @@
+# Désactiver le listing de répertoire
+Options -Indexes
+
+# Autoriser l'accès aux fichiers PDF
+<FilesMatch "\.(pdf)$">
+    Require all granted
+</FilesMatch>
