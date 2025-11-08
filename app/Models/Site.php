@@ -72,4 +72,12 @@ class Site extends Model
 
         return $this->query($sql, [$clientId]);
     }
+
+    /**
+     * Récupère tous les sites avec stats
+     */
+    public function getAll()
+    {
+        return $this->getAllWithDiagnostics();
+    }
 }

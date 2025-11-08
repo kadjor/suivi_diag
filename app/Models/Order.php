@@ -72,6 +72,24 @@ class Order extends Model
     }
 
     /**
+     * Récupère toutes les commandes avec pagination
+     */
+    public function getAll($page = 1, $limit = 20)
+    {
+        $offset = ($page - 1) * $limit;
+        $sql = "SELECT o.*, c.organization_name as client_name,
+                s.label as status_label, s.color as status_color,
+                u.first_name as technician_first_name, u.last_name as technician_last_name
+                FROM orders o
+                LEFT JOIN clients c ON o.client_id = c.id
+                LEFT JOIN statuses s ON o.status_id = s.id
+                LEFT JOIN users u ON o.assigned_to = u.id
+                ORDER BY o.created_at DESC
+                LIMIT ? OFFSET ?";
+        return $this->query($sql, [$limit, $offset]);
+    }
+
+    /**
      * Compte les commandes par code de statut
      */
     public function countByStatus($statusCode)

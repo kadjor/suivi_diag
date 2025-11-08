@@ -32,4 +32,42 @@ class User extends Model
             'password_hash' => password_hash($newPassword, PASSWORD_BCRYPT)
         ]);
     }
+
+    /**
+     * Récupère tous les utilisateurs avec leurs rôles
+     */
+    public function getAll()
+    {
+        $sql = "SELECT u.*, r.name as role_name, r.label as role_label,
+                c.organization_name as client_name
+                FROM users u
+                LEFT JOIN roles r ON u.role_id = r.id
+                LEFT JOIN clients c ON u.client_id = c.id
+                ORDER BY u.created_at DESC";
+        return $this->query($sql);
+    }
+
+    /**
+     * Trouve un utilisateur par nom d'utilisateur
+     */
+    public function findByUsername($username)
+    {
+        return $this->whereOne(['username' => $username]);
+    }
+
+    /**
+     * Trouve un utilisateur par email
+     */
+    public function findByEmail($email)
+    {
+        return $this->whereOne(['email' => $email]);
+    }
+
+    /**
+     * Trouve un utilisateur par token de réinitialisation
+     */
+    public function findByResetToken($token)
+    {
+        return $this->whereOne(['password_reset_token' => $token]);
+    }
 }
