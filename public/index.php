@@ -129,6 +129,7 @@ $router->post('/orders/{id}/generate-ar', 'Controllers\OrderController@generateA
 
 // Routes protégées - Interventions
 $router->get('/interventions', 'Controllers\InterventionController@index');
+$router->post('/interventions/create', 'Controllers\InterventionController@create');
 $router->post('/interventions/update-status', 'Controllers\InterventionController@updateStatus');
 
 // Routes protégées - Sites

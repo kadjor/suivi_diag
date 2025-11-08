@@ -81,6 +81,21 @@ class InterventionController extends Controller
                 'description' => "Intervention planifiée pour le " . date('d/m/Y', strtotime($data['scheduled_date']))
             ]);
 
+            // Envoyer notifications email
+            try {
+                $orderModel = new Order();
+                $order = $orderModel->find($data['order_id']);
+
+                if ($order && !empty($order['notification_emails'])) {
+                    $emailService = new \Services\EmailService();
+                    $recipients = explode(',', $order['notification_emails']);
+                    $intervention = $this->interventionModel->find($interventionId);
+                    $emailService->sendInterventionScheduledNotification($intervention, $order, $recipients);
+                }
+            } catch (\Exception $emailError) {
+                error_log('Erreur envoi email: ' . $emailError->getMessage());
+            }
+
             Session::flash('success', 'Intervention créée avec succès');
             View::json(['success' => true, 'intervention_id' => $interventionId]);
 

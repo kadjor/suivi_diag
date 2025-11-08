@@ -64,11 +64,29 @@ class ReportController extends Controller
             $reportId = $this->reportModel->create([
                 'order_id' => $orderId,
                 'type' => $type,
+                'file_name' => $uploadedFile['filename'],
                 'filename' => $uploadedFile['filename'],
                 'file_path' => $uploadedFile['path'],
                 'file_size' => $uploadedFile['size'],
-                'uploaded_by' => Auth::id()
+                'uploaded_by' => Auth::id(),
+                'uploaded_at' => date('Y-m-d H:i:s')
             ]);
+
+            // Envoyer notifications email
+            try {
+                $orderModel = new Order();
+                $order = $orderModel->find($orderId);
+
+                if ($order && !empty($order['notification_emails'])) {
+                    $emailService = new \Services\EmailService();
+                    $recipients = explode(',', $order['notification_emails']);
+                    $report = $this->reportModel->find($reportId);
+                    $emailService->sendReportUploadedNotification($report, $order, $recipients);
+                }
+            } catch (\Exception $emailError) {
+                // Log l'erreur mais ne bloque pas l'upload
+                error_log('Erreur envoi email: ' . $emailError->getMessage());
+            }
 
             Session::flash('success', 'Rapport téléversé avec succès');
             View::json(['success' => true, 'report_id' => $reportId]);
