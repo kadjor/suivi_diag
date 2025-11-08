@@ -244,7 +244,7 @@ class OrderController extends Controller
      */
     public function edit($id)
     {
-        $order = $this->orderModel->find($id);
+        $order = $this->orderModel->getWithDetails($id);
 
         if (!$order) {
             Session::flash('error', 'Commande introuvable');
@@ -288,7 +288,7 @@ class OrderController extends Controller
         $data = $_POST;
 
         $validator = new Validator($data);
-        $validator->required(['client_id', 'site_id', 'order_date']);
+        $validator->required(['client_id']);
 
         if (!$validator->validate()) {
             Session::flash('error', implode(', ', $validator->getErrors()));
@@ -298,12 +298,11 @@ class OrderController extends Controller
         try {
             $this->orderModel->update($id, [
                 'client_id' => $data['client_id'],
-                'site_id' => $data['site_id'],
-                'order_date' => $data['order_date'],
-                'desired_date' => $data['desired_date'] ?? null,
-                'assigned_to' => $data['assigned_to'] ?? null,
+                'requested_date' => !empty($data['requested_date']) ? $data['requested_date'] : null,
+                'deadline_date' => !empty($data['deadline_date']) ? $data['deadline_date'] : null,
+                'assigned_to' => !empty($data['assigned_to']) ? $data['assigned_to'] : null,
                 'description' => $data['description'] ?? null,
-                'notes' => $data['notes'] ?? null
+                'priority' => $data['priority'] ?? 'normal'
             ]);
 
             $eventModel = new OrderEvent();

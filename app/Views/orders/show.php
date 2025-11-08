@@ -28,11 +28,11 @@
             </div>
             <div class="info-item">
                 <strong>Date de commande:</strong>
-                <span><?= date('d/m/Y', strtotime($order['order_date'])) ?></span>
+                <span><?= date('d/m/Y H:i', strtotime($order['created_at'])) ?></span>
             </div>
             <div class="info-item">
                 <strong>Date souhaitée:</strong>
-                <span><?= $order['desired_date'] ? date('d/m/Y', strtotime($order['desired_date'])) : 'N/A' ?></span>
+                <span><?= $order['requested_date'] ? date('d/m/Y', strtotime($order['requested_date'])) : 'N/A' ?></span>
             </div>
             <div class="info-item">
                 <strong>Technicien assigné:</strong>

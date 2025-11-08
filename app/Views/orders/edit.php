@@ -31,14 +31,24 @@
 
     <div class="form-row">
         <div class="form-group">
-            <label for="order_date">Date de commande *</label>
-            <input type="date" id="order_date" name="order_date" value="<?= date('Y-m-d', strtotime($order['order_date'])) ?>" required class="form-control">
+            <label for="requested_date">Date souhaitée</label>
+            <input type="date" id="requested_date" name="requested_date" value="<?= $order['requested_date'] ? date('Y-m-d', strtotime($order['requested_date'])) : '' ?>" class="form-control">
         </div>
 
         <div class="form-group">
-            <label for="desired_date">Date souhaitée</label>
-            <input type="date" id="desired_date" name="desired_date" value="<?= $order['desired_date'] ? date('Y-m-d', strtotime($order['desired_date'])) : '' ?>" class="form-control">
+            <label for="deadline_date">Date limite</label>
+            <input type="date" id="deadline_date" name="deadline_date" value="<?= $order['deadline_date'] ? date('Y-m-d', strtotime($order['deadline_date'])) : '' ?>" class="form-control">
         </div>
+    </div>
+
+    <div class="form-group">
+        <label for="priority">Priorité</label>
+        <select id="priority" name="priority" class="form-control">
+            <option value="low" <?= ($order['priority'] ?? 'normal') == 'low' ? 'selected' : '' ?>>Basse</option>
+            <option value="normal" <?= ($order['priority'] ?? 'normal') == 'normal' ? 'selected' : '' ?>>Normale</option>
+            <option value="high" <?= ($order['priority'] ?? 'normal') == 'high' ? 'selected' : '' ?>>Haute</option>
+            <option value="urgent" <?= ($order['priority'] ?? 'normal') == 'urgent' ? 'selected' : '' ?>>Urgente</option>
+        </select>
     </div>
 
     <div class="form-group">
