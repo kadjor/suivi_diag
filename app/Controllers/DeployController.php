@@ -669,4 +669,266 @@ class DeployController extends Controller
             ], 400);
         }
     }
+
+    /**
+     * Liste les migrations disponibles
+     */
+    public function migrations()
+    {
+        $migrationsDir = $this->appDir . '/database/migrations';
+        $migrations = [];
+
+        if (!is_dir($migrationsDir)) {
+            View::json(['migrations' => []]);
+            return;
+        }
+
+        $files = glob($migrationsDir . '/*.sql');
+        sort($files);
+
+        foreach ($files as $file) {
+            $name = basename($file);
+            $migrations[] = [
+                'name' => $name,
+                'path' => $file,
+                'size' => $this->formatBytes(filesize($file)),
+                'executed' => $this->isMigrationExecuted($name)
+            ];
+        }
+
+        View::json(['migrations' => $migrations]);
+    }
+
+    /**
+     * Vérifie si une migration a déjà été exécutée
+     */
+    private function isMigrationExecuted($migrationName)
+    {
+        try {
+            $db = \Core\Database::getInstance()->getConnection();
+
+            // Vérifier si la table migrations existe
+            $result = $db->query("SHOW TABLES LIKE 'migrations'");
+            if ($result->num_rows === 0) {
+                // Table n'existe pas, créer la table de tracking
+                $this->createMigrationsTable();
+                return false;
+            }
+
+            // Vérifier si cette migration a été exécutée
+            $stmt = $db->prepare("SELECT id FROM migrations WHERE migration = ? LIMIT 1");
+            $stmt->bind_param('s', $migrationName);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            return $result->num_rows > 0;
+
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Crée la table de suivi des migrations
+     */
+    private function createMigrationsTable()
+    {
+        try {
+            $db = \Core\Database::getInstance()->getConnection();
+            $sql = "CREATE TABLE IF NOT EXISTS `migrations` (
+                `id` int(11) NOT NULL AUTO_INCREMENT,
+                `migration` varchar(255) NOT NULL,
+                `executed_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (`id`),
+                UNIQUE KEY `migration` (`migration`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+
+            $db->query($sql);
+            $this->log('✓ Table migrations créée');
+
+        } catch (\Exception $e) {
+            $this->log('✗ Erreur création table migrations: ' . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    /**
+     * Exécute les migrations SQL
+     */
+    public function runMigrations()
+    {
+        $this->log('===== EXÉCUTION DES MIGRATIONS =====');
+        $this->log('Utilisateur: ' . Auth::user()['email']);
+        $this->log('Date: ' . date('Y-m-d H:i:s'));
+
+        $results = [
+            'success' => false,
+            'executed' => [],
+            'skipped' => [],
+            'errors' => []
+        ];
+
+        try {
+            $migrationsDir = $this->appDir . '/database/migrations';
+
+            if (!is_dir($migrationsDir)) {
+                throw new \Exception('Dossier migrations introuvable');
+            }
+
+            // S'assurer que la table migrations existe
+            $this->createMigrationsTable();
+
+            // Récupérer toutes les migrations
+            $files = glob($migrationsDir . '/*.sql');
+            sort($files);
+
+            if (empty($files)) {
+                $results['errors'][] = 'Aucune migration trouvée';
+                View::json($results);
+                return;
+            }
+
+            $db = \Core\Database::getInstance()->getConnection();
+
+            foreach ($files as $file) {
+                $migrationName = basename($file);
+
+                // Vérifier si déjà exécutée
+                if ($this->isMigrationExecuted($migrationName)) {
+                    $results['skipped'][] = $migrationName;
+                    $this->log("⊘ Migration déjà exécutée: {$migrationName}");
+                    continue;
+                }
+
+                $this->log("Exécution de: {$migrationName}");
+
+                try {
+                    // Lire le fichier SQL
+                    $sql = file_get_contents($file);
+
+                    // Supprimer les commentaires SQL
+                    $sql = preg_replace('/--.*$/m', '', $sql);
+
+                    // Séparer les instructions SQL
+                    $statements = $this->splitSqlStatements($sql);
+
+                    // Exécuter chaque instruction
+                    foreach ($statements as $statement) {
+                        $statement = trim($statement);
+                        if (empty($statement)) {
+                            continue;
+                        }
+
+                        if (!$db->query($statement)) {
+                            throw new \Exception("Erreur SQL: " . $db->error . "\nRequête: " . substr($statement, 0, 100));
+                        }
+                    }
+
+                    // Enregistrer la migration comme exécutée
+                    $stmt = $db->prepare("INSERT INTO migrations (migration) VALUES (?)");
+                    $stmt->bind_param('s', $migrationName);
+                    $stmt->execute();
+
+                    $results['executed'][] = $migrationName;
+                    $this->log("✓ Migration exécutée: {$migrationName}");
+
+                } catch (\Exception $e) {
+                    $error = "Erreur dans {$migrationName}: " . $e->getMessage();
+                    $results['errors'][] = $error;
+                    $this->log("✗ {$error}");
+                    // Continuer avec les autres migrations
+                }
+            }
+
+            $results['success'] = empty($results['errors']);
+
+            if ($results['success']) {
+                $this->log('===== MIGRATIONS RÉUSSIES =====');
+            } else {
+                $this->log('===== MIGRATIONS TERMINÉES AVEC ERREURS =====');
+            }
+
+        } catch (\Exception $e) {
+            $results['errors'][] = $e->getMessage();
+            $this->log('✗ ERREUR: ' . $e->getMessage());
+            $this->log('===== MIGRATIONS ÉCHOUÉES =====');
+        }
+
+        View::json($results);
+    }
+
+    /**
+     * Sépare les instructions SQL multiples
+     */
+    private function splitSqlStatements($sql)
+    {
+        $statements = [];
+        $current = '';
+        $inString = false;
+        $stringChar = '';
+        $length = strlen($sql);
+
+        for ($i = 0; $i < $length; $i++) {
+            $char = $sql[$i];
+            $prevChar = $i > 0 ? $sql[$i - 1] : '';
+
+            // Gérer les chaînes de caractères
+            if (($char === '"' || $char === "'") && $prevChar !== '\\') {
+                if (!$inString) {
+                    $inString = true;
+                    $stringChar = $char;
+                } elseif ($char === $stringChar) {
+                    $inString = false;
+                }
+            }
+
+            // Si on trouve un point-virgule hors d'une chaîne
+            if ($char === ';' && !$inString) {
+                $current .= $char;
+                $statement = trim($current);
+                if (!empty($statement)) {
+                    $statements[] = $statement;
+                }
+                $current = '';
+            } else {
+                $current .= $char;
+            }
+        }
+
+        // Ajouter la dernière instruction s'il y en a une
+        $statement = trim($current);
+        if (!empty($statement)) {
+            $statements[] = $statement;
+        }
+
+        return $statements;
+    }
+
+    /**
+     * Réinitialise les migrations (DANGER - à utiliser avec précaution)
+     */
+    public function resetMigrations()
+    {
+        $this->log('===== RÉINITIALISATION DES MIGRATIONS =====');
+        $this->log('Utilisateur: ' . Auth::user()['email']);
+
+        try {
+            $db = \Core\Database::getInstance()->getConnection();
+            $db->query("DROP TABLE IF EXISTS migrations");
+            $this->createMigrationsTable();
+
+            $this->log('✓ Migrations réinitialisées');
+            View::json([
+                'success' => true,
+                'message' => 'Table migrations réinitialisée'
+            ]);
+
+        } catch (\Exception $e) {
+            $this->log('✗ Erreur: ' . $e->getMessage());
+            View::json([
+                'success' => false,
+                'error' => $e->getMessage()
+            ], 400);
+        }
+    }
 }

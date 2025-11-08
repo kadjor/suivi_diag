@@ -120,6 +120,24 @@
         <div id="actionResult" class="action-result"></div>
     </div>
 
+    <!-- Migrations de base de données -->
+    <div class="card">
+        <h2>🗄️ Migrations de base de données</h2>
+        <p class="info-text">Gérez les migrations SQL pour créer et mettre à jour les tables de la base de données.</p>
+
+        <div class="action-buttons">
+            <button id="btnLoadMigrations" class="btn btn-info">
+                📋 Charger les migrations
+            </button>
+            <button id="btnRunMigrations" class="btn btn-primary" style="display:none;">
+                ▶️ Exécuter les migrations en attente
+            </button>
+        </div>
+
+        <div id="migrationsResult" class="migrations-result"></div>
+        <div id="migrationsList" class="migrations-list"></div>
+    </div>
+
     <!-- Derniers commits -->
     <div class="card">
         <h2>📝 Derniers commits</h2>
@@ -462,6 +480,141 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
+
+// Charger les migrations
+document.getElementById('btnLoadMigrations')?.addEventListener('click', async function() {
+    this.disabled = true;
+    this.textContent = '⏳ Chargement...';
+
+    const migrationsListDiv = document.getElementById('migrationsList');
+    const btnRunMigrations = document.getElementById('btnRunMigrations');
+
+    try {
+        const response = await fetch('/deploy/migrations');
+        const data = await response.json();
+
+        let html = '';
+
+        if (data.migrations && data.migrations.length > 0) {
+            html += '<table class="data-table">';
+            html += '<thead><tr><th>Fichier</th><th>Taille</th><th>Statut</th></tr></thead>';
+            html += '<tbody>';
+
+            let hasPending = false;
+            data.migrations.forEach(migration => {
+                const status = migration.executed ?
+                    '<span class="badge badge-success">✅ Exécutée</span>' :
+                    '<span class="badge badge-warning">⏳ En attente</span>';
+
+                if (!migration.executed) {
+                    hasPending = true;
+                }
+
+                html += '<tr>';
+                html += '<td><code>' + escapeHtml(migration.name) + '</code></td>';
+                html += '<td>' + escapeHtml(migration.size) + '</td>';
+                html += '<td>' + status + '</td>';
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+
+            // Afficher le bouton d'exécution si des migrations sont en attente
+            if (hasPending) {
+                btnRunMigrations.style.display = 'inline-block';
+            } else {
+                btnRunMigrations.style.display = 'none';
+            }
+        } else {
+            html = '<p class="no-data">Aucune migration trouvée dans database/migrations/</p>';
+            btnRunMigrations.style.display = 'none';
+        }
+
+        migrationsListDiv.innerHTML = html;
+    } catch (error) {
+        migrationsListDiv.innerHTML = '<div class="result-error">❌ Erreur: ' + escapeHtml(error.message) + '</div>';
+    } finally {
+        this.disabled = false;
+        this.textContent = '📋 Charger les migrations';
+    }
+});
+
+// Exécuter les migrations
+document.getElementById('btnRunMigrations')?.addEventListener('click', async function() {
+    if (!confirm('⚠️ Voulez-vous exécuter les migrations en attente?\n\nCela va créer/modifier les tables de la base de données.')) {
+        return;
+    }
+
+    this.disabled = true;
+    this.textContent = '⏳ Exécution en cours...';
+
+    const resultDiv = document.getElementById('migrationsResult');
+    resultDiv.innerHTML = '<div class="loading">⏳ Exécution des migrations en cours...</div>';
+
+    try {
+        const response = await fetch('/deploy/run-migrations', { method: 'POST' });
+        const data = await response.json();
+
+        let resultHtml = '';
+
+        if (data.success) {
+            resultHtml = '<div class="result-success"><h3>✅ Migrations exécutées avec succès !</h3>';
+
+            if (data.executed && data.executed.length > 0) {
+                resultHtml += '<p><strong>Migrations exécutées:</strong></p>';
+                resultHtml += '<ul>';
+                data.executed.forEach(migration => {
+                    resultHtml += '<li>✅ ' + escapeHtml(migration) + '</li>';
+                });
+                resultHtml += '</ul>';
+            }
+
+            if (data.skipped && data.skipped.length > 0) {
+                resultHtml += '<p><strong>Migrations ignorées (déjà exécutées):</strong></p>';
+                resultHtml += '<ul>';
+                data.skipped.forEach(migration => {
+                    resultHtml += '<li>⊘ ' + escapeHtml(migration) + '</li>';
+                });
+                resultHtml += '</ul>';
+            }
+
+            resultHtml += '</div>';
+
+            // Recharger la liste des migrations
+            setTimeout(() => {
+                document.getElementById('btnLoadMigrations').click();
+            }, 1000);
+        } else {
+            resultHtml = '<div class="result-error"><h3>❌ Erreur lors de l\'exécution</h3>';
+
+            if (data.errors && data.errors.length > 0) {
+                resultHtml += '<ul>';
+                data.errors.forEach(err => {
+                    resultHtml += '<li>' + escapeHtml(err) + '</li>';
+                });
+                resultHtml += '</ul>';
+            }
+
+            if (data.executed && data.executed.length > 0) {
+                resultHtml += '<p><strong>Migrations exécutées avant l\'erreur:</strong></p>';
+                resultHtml += '<ul>';
+                data.executed.forEach(migration => {
+                    resultHtml += '<li>✅ ' + escapeHtml(migration) + '</li>';
+                });
+                resultHtml += '</ul>';
+            }
+
+            resultHtml += '</div>';
+        }
+
+        resultDiv.innerHTML = resultHtml;
+
+    } catch (error) {
+        resultDiv.innerHTML = '<div class="result-error">❌ Erreur: ' + escapeHtml(error.message) + '</div>';
+    } finally {
+        this.disabled = false;
+        this.textContent = '▶️ Exécuter les migrations en attente';
+    }
+});
 </script>
 
 <style>
@@ -860,5 +1013,28 @@ function escapeHtml(text) {
 
 .btn-success:hover:not(:disabled) {
     background: #229954;
+}
+
+/* Migrations */
+.info-text {
+    color: #666;
+    margin-bottom: 15px;
+    font-size: 0.95em;
+}
+
+.migrations-result {
+    margin-top: 15px;
+}
+
+.migrations-list {
+    margin-top: 15px;
+}
+
+.migrations-list code {
+    background: #f4f4f4;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
 }
 </style>
