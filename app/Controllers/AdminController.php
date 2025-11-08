@@ -53,7 +53,14 @@ class AdminController extends Controller
         $settingsModel = new \Models\Setting();
         $settings = $settingsModel->getAllAsArray();
 
-        View::render('admin.settings', ['settings' => $settings]);
+        // Charger la configuration email depuis le fichier
+        $emailConfigFile = __DIR__ . '/../../config/email.php';
+        $emailConfig = file_exists($emailConfigFile) ? require $emailConfigFile : [];
+
+        View::render('admin.settings', [
+            'settings' => $settings,
+            'emailConfig' => $emailConfig
+        ]);
     }
 
     public function updateSettings()
@@ -64,12 +71,37 @@ class AdminController extends Controller
         }
 
         try {
-            $settingsModel = new \Models\Setting();
             $data = $_POST;
 
-            // Sauvegarder chaque paramètre
+            // Séparer les paramètres email des autres paramètres
+            $emailParams = [
+                'smtp_host', 'smtp_port', 'smtp_encryption',
+                'smtp_username', 'smtp_password', 'from_email',
+                'from_name', 'admin_email', 'enabled', 'debug'
+            ];
+
+            $emailData = [];
+            $otherData = [];
+
             foreach ($data as $key => $value) {
-                $settingsModel->set($key, $value);
+                if (in_array($key, $emailParams)) {
+                    $emailData[$key] = $value;
+                } else {
+                    $otherData[$key] = $value;
+                }
+            }
+
+            // Sauvegarder les paramètres email dans le fichier
+            if (!empty($emailData)) {
+                $this->saveEmailConfig($emailData);
+            }
+
+            // Sauvegarder les autres paramètres dans la base de données
+            if (!empty($otherData)) {
+                $settingsModel = new \Models\Setting();
+                foreach ($otherData as $key => $value) {
+                    $settingsModel->set($key, $value);
+                }
             }
 
             Session::flash('success', 'Paramètres mis à jour avec succès');
@@ -78,6 +110,54 @@ class AdminController extends Controller
         }
 
         View::redirect('/admin/settings');
+    }
+
+    /**
+     * Sauvegarde la configuration email dans le fichier config/email.php
+     */
+    private function saveEmailConfig($data)
+    {
+        $emailConfigFile = __DIR__ . '/../../config/email.php';
+
+        // Charger la configuration actuelle
+        $currentConfig = file_exists($emailConfigFile) ? require $emailConfigFile : [];
+
+        // Fusionner avec les nouvelles données
+        $newConfig = array_merge($currentConfig, $data);
+
+        // Convertir les booléens
+        $newConfig['enabled'] = isset($newConfig['enabled']) && $newConfig['enabled'] === 'on';
+        $newConfig['debug'] = isset($newConfig['debug']) && $newConfig['debug'] === 'on';
+
+        // Générer le contenu du fichier
+        $content = "<?php\n";
+        $content .= "/**\n";
+        $content .= " * Configuration Email\n";
+        $content .= " * Ce fichier n'est pas versionné et ne sera pas écrasé lors des mises à jour\n";
+        $content .= " * Dernière modification : " . date('d/m/Y H:i:s') . "\n";
+        $content .= " */\n\n";
+        $content .= "return [\n";
+        $content .= "    // Configuration SMTP\n";
+        $content .= "    'smtp_host' => " . var_export($newConfig['smtp_host'] ?? '', true) . ",\n";
+        $content .= "    'smtp_port' => " . var_export((int)($newConfig['smtp_port'] ?? 587), true) . ",\n";
+        $content .= "    'smtp_encryption' => " . var_export($newConfig['smtp_encryption'] ?? 'tls', true) . ",\n";
+        $content .= "    'smtp_username' => " . var_export($newConfig['smtp_username'] ?? '', true) . ",\n";
+        $content .= "    'smtp_password' => " . var_export($newConfig['smtp_password'] ?? '', true) . ",\n\n";
+        $content .= "    // Expéditeur par défaut\n";
+        $content .= "    'from_email' => " . var_export($newConfig['from_email'] ?? 'noreply@d-evidences.fr', true) . ",\n";
+        $content .= "    'from_name' => " . var_export($newConfig['from_name'] ?? 'D-Evidences', true) . ",\n\n";
+        $content .= "    // Email de l'administrateur\n";
+        $content .= "    'admin_email' => " . var_export($newConfig['admin_email'] ?? 'admin@d-evidences.fr', true) . ",\n\n";
+        $content .= "    // Activer/désactiver les emails\n";
+        $content .= "    'enabled' => " . var_export($newConfig['enabled'] ?? true, true) . ",\n\n";
+        $content .= "    // Mode debug\n";
+        $content .= "    'debug' => " . var_export($newConfig['debug'] ?? false, true) . "\n";
+        $content .= "];\n";
+
+        // Écrire le fichier
+        if (file_put_contents($emailConfigFile, $content) === false) {
+            throw new \Exception('Impossible d\'écrire le fichier de configuration email');
+        }
     }
 
     public function testEmail()

@@ -1,5 +1,6 @@
 # Configuration sensible
 config/database.php
+config/email.php
 
 # Logs
 logs/*.log

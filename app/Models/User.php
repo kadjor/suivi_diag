@@ -70,4 +70,17 @@ class User extends Model
     {
         return $this->whereOne(['password_reset_token' => $token]);
     }
+
+    /**
+     * Récupère les utilisateurs par rôle
+     */
+    public function getByRole($roleName)
+    {
+        $sql = "SELECT u.*, r.name as role_name, r.label as role_label
+                FROM users u
+                LEFT JOIN roles r ON u.role_id = r.id
+                WHERE r.name = ? AND u.active = 1
+                ORDER BY u.first_name, u.last_name";
+        return $this->query($sql, [$roleName]);
+    }
 }

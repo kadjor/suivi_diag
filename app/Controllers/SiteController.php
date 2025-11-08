@@ -43,9 +43,34 @@ class SiteController extends Controller
         $diagnosticModel = new \Models\Diagnostic();
         $diagnostics = $diagnosticModel->getBySite($id);
 
+        // Récupérer les commandes pour ce site via le client
+        $orderModel = new \Models\Order();
+        $orders = $orderModel->query(
+            "SELECT o.*, st.label as status_label, st.color as status_color
+             FROM orders o
+             LEFT JOIN statuses st ON o.status_id = st.id
+             WHERE o.client_id = ?
+             ORDER BY o.created_at DESC",
+            [$site['client_id']]
+        );
+
+        // Récupérer les rapports pour ce site
+        $reportModel = new \Models\Report();
+        $reports = $reportModel->query(
+            "SELECT r.*, o.order_number, u.first_name, u.last_name
+             FROM reports r
+             LEFT JOIN orders o ON r.order_id = o.id
+             LEFT JOIN users u ON r.uploaded_by = u.id
+             WHERE o.client_id = ?
+             ORDER BY r.uploaded_at DESC",
+            [$site['client_id']]
+        );
+
         View::render('sites.show', [
             'site' => $site,
-            'diagnostics' => $diagnostics
+            'diagnostics' => $diagnostics,
+            'orders' => $orders,
+            'reports' => $reports
         ]);
     }
 

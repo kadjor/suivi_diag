@@ -94,6 +94,86 @@
         <p class="no-data">Aucun diagnostic pour ce site</p>
         <?php endif; ?>
     </div>
+
+    <!-- Commandes -->
+    <div class="card full-width">
+        <h2>Bons de commande (<?= count($orders ?? []) ?>)</h2>
+
+        <?php if (!empty($orders)): ?>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>N° Commande</th>
+                    <th>Date</th>
+                    <th>Statut</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($orders as $order): ?>
+                <tr>
+                    <td>
+                        <a href="/orders/<?= $order['id'] ?>">
+                            <?= htmlspecialchars($order['order_number']) ?>
+                        </a>
+                    </td>
+                    <td><?= date('d/m/Y', strtotime($order['created_at'])) ?></td>
+                    <td>
+                        <span class="badge" style="background-color: <?= htmlspecialchars($order['status_color'] ?? '#95a5a6') ?>">
+                            <?= htmlspecialchars($order['status_label'] ?? 'N/A') ?>
+                        </span>
+                    </td>
+                    <td>
+                        <a href="/orders/<?= $order['id'] ?>" class="btn btn-small">Voir détails</a>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+        <?php else: ?>
+        <p class="no-data">Aucune commande pour ce site</p>
+        <?php endif; ?>
+    </div>
+
+    <!-- Rapports -->
+    <div class="card full-width">
+        <h2>Rapports de diagnostic (<?= count($reports ?? []) ?>)</h2>
+
+        <?php if (!empty($reports)): ?>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Nom du fichier</th>
+                    <th>Commande</th>
+                    <th>Téléversé par</th>
+                    <th>Date</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($reports as $report): ?>
+                <tr>
+                    <td><?= htmlspecialchars($report['filename']) ?></td>
+                    <td>
+                        <a href="/orders/<?= $report['order_id'] ?>">
+                            <?= htmlspecialchars($report['order_number']) ?>
+                        </a>
+                    </td>
+                    <td><?= htmlspecialchars($report['first_name'] . ' ' . $report['last_name']) ?></td>
+                    <td><?= date('d/m/Y H:i', strtotime($report['uploaded_at'])) ?></td>
+                    <td>
+                        <a href="/reports/<?= $report['id'] ?>/download" class="btn btn-small btn-primary" download>
+                            📥 Télécharger
+                        </a>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+        <?php else: ?>
+        <p class="no-data">Aucun rapport pour ce site</p>
+        <?php endif; ?>
+    </div>
 </div>
 
 <style>
