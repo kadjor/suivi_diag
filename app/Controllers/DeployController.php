@@ -675,28 +675,53 @@ class DeployController extends Controller
      */
     public function migrations()
     {
-        $migrationsDir = $this->appDir . '/database/migrations';
-        $migrations = [];
+        try {
+            // Nettoyer tout buffer de sortie existant
+            if (ob_get_level()) {
+                ob_clean();
+            }
 
-        if (!is_dir($migrationsDir)) {
-            View::json(['migrations' => []]);
-            return;
+            $migrationsDir = $this->appDir . '/database/migrations';
+            $migrations = [];
+
+            if (!is_dir($migrationsDir)) {
+                View::json(['migrations' => []]);
+                return;
+            }
+
+            $files = glob($migrationsDir . '/*.sql');
+
+            if ($files === false) {
+                View::json(['migrations' => []]);
+                return;
+            }
+
+            sort($files);
+
+            foreach ($files as $file) {
+                $name = basename($file);
+                $migrations[] = [
+                    'name' => $name,
+                    'path' => $file,
+                    'size' => $this->formatBytes(filesize($file)),
+                    'executed' => $this->isMigrationExecuted($name)
+                ];
+            }
+
+            View::json(['migrations' => $migrations]);
+
+        } catch (\Exception $e) {
+            // Nettoyer tout buffer de sortie
+            if (ob_get_level()) {
+                ob_clean();
+            }
+
+            $this->log('✗ Erreur liste migrations: ' . $e->getMessage());
+            View::json([
+                'error' => $e->getMessage(),
+                'migrations' => []
+            ], 500);
         }
-
-        $files = glob($migrationsDir . '/*.sql');
-        sort($files);
-
-        foreach ($files as $file) {
-            $name = basename($file);
-            $migrations[] = [
-                'name' => $name,
-                'path' => $file,
-                'size' => $this->formatBytes(filesize($file)),
-                'executed' => $this->isMigrationExecuted($name)
-            ];
-        }
-
-        View::json(['migrations' => $migrations]);
     }
 
     /**
@@ -757,18 +782,23 @@ class DeployController extends Controller
      */
     public function runMigrations()
     {
-        $this->log('===== EXÉCUTION DES MIGRATIONS =====');
-        $this->log('Utilisateur: ' . Auth::user()['email']);
-        $this->log('Date: ' . date('Y-m-d H:i:s'));
-
-        $results = [
-            'success' => false,
-            'executed' => [],
-            'skipped' => [],
-            'errors' => []
-        ];
-
         try {
+            // Nettoyer tout buffer de sortie existant
+            if (ob_get_level()) {
+                ob_clean();
+            }
+
+            $this->log('===== EXÉCUTION DES MIGRATIONS =====');
+            $this->log('Utilisateur: ' . Auth::user()['email']);
+            $this->log('Date: ' . date('Y-m-d H:i:s'));
+
+            $results = [
+                'success' => false,
+                'executed' => [],
+                'skipped' => [],
+                'errors' => []
+            ];
+
             $migrationsDir = $this->appDir . '/database/migrations';
 
             if (!is_dir($migrationsDir)) {
@@ -780,14 +810,15 @@ class DeployController extends Controller
 
             // Récupérer toutes les migrations
             $files = glob($migrationsDir . '/*.sql');
-            sort($files);
 
-            if (empty($files)) {
+            if ($files === false || empty($files)) {
                 $results['errors'][] = 'Aucune migration trouvée';
+                $this->log('✗ Aucune migration trouvée');
                 View::json($results);
                 return;
             }
 
+            sort($files);
             $db = \Core\Database::getInstance()->getConnection();
 
             foreach ($files as $file) {
@@ -805,6 +836,10 @@ class DeployController extends Controller
                 try {
                     // Lire le fichier SQL
                     $sql = file_get_contents($file);
+
+                    if ($sql === false) {
+                        throw new \Exception("Impossible de lire le fichier");
+                    }
 
                     // Supprimer les commentaires SQL
                     $sql = preg_replace('/--.*$/m', '', $sql);
@@ -848,13 +883,24 @@ class DeployController extends Controller
                 $this->log('===== MIGRATIONS TERMINÉES AVEC ERREURS =====');
             }
 
-        } catch (\Exception $e) {
-            $results['errors'][] = $e->getMessage();
-            $this->log('✗ ERREUR: ' . $e->getMessage());
-            $this->log('===== MIGRATIONS ÉCHOUÉES =====');
-        }
+            View::json($results);
 
-        View::json($results);
+        } catch (\Exception $e) {
+            // Nettoyer tout buffer de sortie
+            if (ob_get_level()) {
+                ob_clean();
+            }
+
+            $this->log('✗ ERREUR CRITIQUE: ' . $e->getMessage());
+            $this->log('===== MIGRATIONS ÉCHOUÉES =====');
+
+            View::json([
+                'success' => false,
+                'executed' => [],
+                'skipped' => [],
+                'errors' => [$e->getMessage()]
+            ], 500);
+        }
     }
 
     /**
