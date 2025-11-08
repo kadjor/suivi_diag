@@ -137,6 +137,14 @@ $router->get('/sites/create', 'Controllers\SiteController@create');
 $router->post('/sites/store', 'Controllers\SiteController@store');
 $router->get('/sites/{id}', 'Controllers\SiteController@show');
 
+// Routes protégées - Clients
+$router->get('/clients', 'Controllers\ClientController@index');
+$router->get('/clients/create', 'Controllers\ClientController@create');
+$router->post('/clients/store', 'Controllers\ClientController@store');
+$router->get('/clients/{id}', 'Controllers\ClientController@show');
+$router->get('/clients/{id}/edit', 'Controllers\ClientController@edit');
+$router->post('/clients/{id}/update', 'Controllers\ClientController@update');
+
 // Routes protégées - Cartographie
 $router->get('/map', 'Controllers\MapController@index');
 $router->get('/map/data', 'Controllers\MapController@getData');
@@ -167,6 +175,11 @@ $router->post('/users/store', 'Controllers\UserController@store');
 $router->get('/users/{id}/edit', 'Controllers\UserController@edit');
 $router->post('/users/{id}/update', 'Controllers\UserController@update');
 $router->post('/users/{id}/delete', 'Controllers\UserController@delete');
+
+// Routes protégées - Profil utilisateur
+$router->get('/profile', 'Controllers\UserController@profile');
+$router->post('/profile/update', 'Controllers\UserController@updateProfile');
+$router->post('/profile/change-password', 'Controllers\UserController@changePassword');
 
 // Routes protégées - Administration
 $router->get('/admin', 'Controllers\AdminController@index');
