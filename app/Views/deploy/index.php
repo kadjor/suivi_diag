@@ -1,19 +1,29 @@
 <h1>🚀 Déploiement et Mise à jour</h1>
 
 <div class="deploy-container">
-    <!-- Statut Git -->
+    <!-- Statut -->
     <div class="card">
-        <h2>📊 Statut Git</h2>
+        <h2>📊 Statut <?= $isGitRepo ? 'Git' : 'du déploiement' ?></h2>
+
+        <?php if (!$isGitRepo): ?>
+        <div class="alert alert-info">
+            <strong>ℹ️ Mode sans Git détecté</strong>
+            <p>Ce répertoire n'est pas un dépôt Git. Utilisez le téléchargement direct depuis GitHub.</p>
+        </div>
+        <?php endif; ?>
 
         <div class="info-grid">
             <div class="info-item">
-                <strong>Branche actuelle:</strong>
-                <span class="badge badge-info"><?= htmlspecialchars($currentBranch) ?></span>
+                <strong>Type:</strong>
+                <span class="badge <?= $isGitRepo ? 'badge-success' : 'badge-warning' ?>">
+                    <?= $isGitRepo ? '✅ Git Repository' : '⚠️ Non-Git' ?>
+                </span>
             </div>
 
+            <?php if ($isGitRepo): ?>
             <div class="info-item">
-                <strong>Répertoire:</strong>
-                <span><?= htmlspecialchars($appDir) ?></span>
+                <strong>Branche actuelle:</strong>
+                <span class="badge badge-info"><?= htmlspecialchars($currentBranch) ?></span>
             </div>
 
             <div class="info-item">
@@ -24,9 +34,15 @@
                     <span class="badge badge-success">✅ Propre</span>
                 <?php endif; ?>
             </div>
+            <?php endif; ?>
+
+            <div class="info-item">
+                <strong>Répertoire:</strong>
+                <span><?= htmlspecialchars($appDir) ?></span>
+            </div>
         </div>
 
-        <?php if (!empty($gitStatus['files'])): ?>
+        <?php if ($isGitRepo && !empty($gitStatus['files'])): ?>
         <div class="git-changes">
             <h3>Fichiers modifiés:</h3>
             <pre class="code-block"><?php
@@ -42,6 +58,8 @@
     <div class="card">
         <h2>⚙️ Actions</h2>
 
+        <?php if ($isGitRepo): ?>
+        <!-- Actions Git -->
         <div class="action-buttons">
             <button id="btnDiff" class="btn btn-info">
                 📋 Voir les différences
@@ -57,10 +75,47 @@
             </button>
             <?php endif; ?>
 
+            <button id="btnPermissions" class="btn btn-success">
+                🔐 Restaurer les permissions
+            </button>
+
             <button id="btnBackups" class="btn btn-secondary">
                 💾 Voir les backups
             </button>
         </div>
+        <?php else: ?>
+        <!-- Actions non-Git (téléchargement direct) -->
+        <div class="github-form">
+            <h3>📦 Téléchargement depuis GitHub</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="github_user">Utilisateur GitHub:</label>
+                    <input type="text" id="github_user" value="kadjor" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label for="github_repo">Dépôt:</label>
+                    <input type="text" id="github_repo" value="suivi_diag" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label for="github_branch">Branche:</label>
+                    <input type="text" id="github_branch" value="main" class="form-control">
+                </div>
+            </div>
+            <div class="action-buttons">
+                <button id="btnDownloadGithub" class="btn btn-primary">
+                    ⬇️ Télécharger et déployer
+                </button>
+
+                <button id="btnPermissions" class="btn btn-success">
+                    🔐 Restaurer les permissions
+                </button>
+
+                <button id="btnBackups" class="btn btn-secondary">
+                    💾 Voir les backups
+                </button>
+            </div>
+        </div>
+        <?php endif; ?>
 
         <div id="actionResult" class="action-result"></div>
     </div>
@@ -140,86 +195,92 @@ function showModal(title, content, isHtml = false) {
     modal.style.display = 'block';
 }
 
-// Voir les différences
-document.getElementById('btnDiff').addEventListener('click', async function() {
-    this.disabled = true;
-    this.textContent = '⏳ Chargement...';
+// Voir les différences (mode Git uniquement)
+const btnDiff = document.getElementById('btnDiff');
+if (btnDiff) {
+    btnDiff.addEventListener('click', async function() {
+        this.disabled = true;
+        this.textContent = '⏳ Chargement...';
 
-    try {
-        const response = await fetch('/deploy/diff');
-        const data = await response.json();
+        try {
+            const response = await fetch('/deploy/diff');
+            const data = await response.json();
 
-        if (data.diff) {
-            showModal('📋 Différences avec la version distante', data.diff);
-        } else {
-            showModal('📋 Différences', 'Aucune différence trouvée');
+            if (data.diff) {
+                showModal('📋 Différences avec la version distante', data.diff);
+            } else {
+                showModal('📋 Différences', 'Aucune différence trouvée');
+            }
+        } catch (error) {
+            showModal('❌ Erreur', error.message);
+        } finally {
+            this.disabled = false;
+            this.textContent = '📋 Voir les différences';
         }
-    } catch (error) {
-        showModal('❌ Erreur', error.message);
-    } finally {
-        this.disabled = false;
-        this.textContent = '📋 Voir les différences';
-    }
-});
+    });
+}
 
-// Git Pull
-document.getElementById('btnPull').addEventListener('click', async function() {
-    if (!confirm('⚠️ Voulez-vous vraiment mettre à jour l\'application ?\n\nUn backup sera automatiquement créé avant la mise à jour.')) {
-        return;
-    }
-
-    this.disabled = true;
-    this.textContent = '⏳ Mise à jour en cours...';
-    const resultDiv = document.getElementById('actionResult');
-    resultDiv.innerHTML = '<div class="loading">⏳ Mise à jour en cours, veuillez patienter...</div>';
-
-    try {
-        const response = await fetch('/deploy/pull', { method: 'POST' });
-        const data = await response.json();
-
-        let resultHtml = '';
-
-        if (data.success) {
-            resultHtml = '<div class="result-success"><h3>✅ Mise à jour réussie !</h3>';
-
-            if (data.messages && data.messages.length > 0) {
-                resultHtml += '<ul>';
-                data.messages.forEach(msg => {
-                    resultHtml += '<li>' + escapeHtml(msg) + '</li>';
-                });
-                resultHtml += '</ul>';
-            }
-
-            resultHtml += '<p><strong>Veuillez recharger la page pour voir les changements.</strong></p>';
-            resultHtml += '</div>';
-
-            // Recharger après 3 secondes
-            setTimeout(() => {
-                window.location.reload();
-            }, 3000);
-        } else {
-            resultHtml = '<div class="result-error"><h3>❌ Erreur lors de la mise à jour</h3>';
-
-            if (data.errors && data.errors.length > 0) {
-                resultHtml += '<ul>';
-                data.errors.forEach(err => {
-                    resultHtml += '<li>' + escapeHtml(err) + '</li>';
-                });
-                resultHtml += '</ul>';
-            }
-
-            resultHtml += '</div>';
+// Git Pull (mode Git uniquement)
+const btnPull = document.getElementById('btnPull');
+if (btnPull) {
+    btnPull.addEventListener('click', async function() {
+        if (!confirm('⚠️ Voulez-vous vraiment mettre à jour l\'application ?\n\nUn backup sera automatiquement créé avant la mise à jour.')) {
+            return;
         }
 
-        resultDiv.innerHTML = resultHtml;
+        this.disabled = true;
+        this.textContent = '⏳ Mise à jour en cours...';
+        const resultDiv = document.getElementById('actionResult');
+        resultDiv.innerHTML = '<div class="loading">⏳ Mise à jour en cours, veuillez patienter...</div>';
 
-    } catch (error) {
-        resultDiv.innerHTML = '<div class="result-error">❌ Erreur: ' + escapeHtml(error.message) + '</div>';
-    } finally {
-        this.disabled = false;
-        this.textContent = '⬇️ Mettre à jour (Git Pull)';
-    }
-});
+        try {
+            const response = await fetch('/deploy/pull', { method: 'POST' });
+            const data = await response.json();
+
+            let resultHtml = '';
+
+            if (data.success) {
+                resultHtml = '<div class="result-success"><h3>✅ Mise à jour réussie !</h3>';
+
+                if (data.messages && data.messages.length > 0) {
+                    resultHtml += '<ul>';
+                    data.messages.forEach(msg => {
+                        resultHtml += '<li>' + escapeHtml(msg) + '</li>';
+                    });
+                    resultHtml += '</ul>';
+                }
+
+                resultHtml += '<p><strong>Veuillez recharger la page pour voir les changements.</strong></p>';
+                resultHtml += '</div>';
+
+                // Recharger après 3 secondes
+                setTimeout(() => {
+                    window.location.reload();
+                }, 3000);
+            } else {
+                resultHtml = '<div class="result-error"><h3>❌ Erreur lors de la mise à jour</h3>';
+
+                if (data.errors && data.errors.length > 0) {
+                    resultHtml += '<ul>';
+                    data.errors.forEach(err => {
+                        resultHtml += '<li>' + escapeHtml(err) + '</li>';
+                    });
+                    resultHtml += '</ul>';
+                }
+
+                resultHtml += '</div>';
+            }
+
+            resultDiv.innerHTML = resultHtml;
+
+        } catch (error) {
+            resultDiv.innerHTML = '<div class="result-error">❌ Erreur: ' + escapeHtml(error.message) + '</div>';
+        } finally {
+            this.disabled = false;
+            this.textContent = '⬇️ Mettre à jour (Git Pull)';
+        }
+    });
+}
 
 // Reset
 const btnReset = document.getElementById('btnReset');
@@ -292,6 +353,108 @@ document.getElementById('btnBackups').addEventListener('click', async function()
 // Actualiser les logs
 document.getElementById('btnRefreshLogs')?.addEventListener('click', function() {
     window.location.reload();
+});
+
+// Télécharger depuis GitHub (mode non-Git)
+document.getElementById('btnDownloadGithub')?.addEventListener('click', async function() {
+    const githubUser = document.getElementById('github_user').value;
+    const githubRepo = document.getElementById('github_repo').value;
+    const githubBranch = document.getElementById('github_branch').value;
+
+    if (!githubUser || !githubRepo || !githubBranch) {
+        alert('⚠️ Veuillez remplir tous les champs');
+        return;
+    }
+
+    if (!confirm(`⚠️ Voulez-vous vraiment télécharger depuis GitHub?\n\nUtilisateur: ${githubUser}\nDépôt: ${githubRepo}\nBranche: ${githubBranch}\n\nUn backup sera automatiquement créé.`)) {
+        return;
+    }
+
+    this.disabled = true;
+    this.textContent = '⏳ Téléchargement en cours...';
+    const resultDiv = document.getElementById('actionResult');
+    resultDiv.innerHTML = '<div class="loading">⏳ Téléchargement et déploiement en cours, veuillez patienter...</div>';
+
+    try {
+        const formData = new FormData();
+        formData.append('github_user', githubUser);
+        formData.append('github_repo', githubRepo);
+        formData.append('github_branch', githubBranch);
+
+        const response = await fetch('/deploy/download-github', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await response.json();
+
+        let resultHtml = '';
+
+        if (data.success) {
+            resultHtml = '<div class="result-success"><h3>✅ Téléchargement et déploiement réussis !</h3>';
+
+            if (data.messages && data.messages.length > 0) {
+                resultHtml += '<ul>';
+                data.messages.forEach(msg => {
+                    resultHtml += '<li>' + escapeHtml(msg) + '</li>';
+                });
+                resultHtml += '</ul>';
+            }
+
+            resultHtml += '<p><strong>Veuillez recharger la page pour voir les changements.</strong></p>';
+            resultHtml += '</div>';
+
+            // Recharger après 3 secondes
+            setTimeout(() => {
+                window.location.reload();
+            }, 3000);
+        } else {
+            resultHtml = '<div class="result-error"><h3>❌ Erreur lors du téléchargement</h3>';
+
+            if (data.errors && data.errors.length > 0) {
+                resultHtml += '<ul>';
+                data.errors.forEach(err => {
+                    resultHtml += '<li>' + escapeHtml(err) + '</li>';
+                });
+                resultHtml += '</ul>';
+            }
+
+            resultHtml += '</div>';
+        }
+
+        resultDiv.innerHTML = resultHtml;
+
+    } catch (error) {
+        resultDiv.innerHTML = '<div class="result-error">❌ Erreur: ' + escapeHtml(error.message) + '</div>';
+    } finally {
+        this.disabled = false;
+        this.textContent = '⬇️ Télécharger et déployer';
+    }
+});
+
+// Restaurer les permissions
+document.getElementById('btnPermissions')?.addEventListener('click', async function() {
+    if (!confirm('🔐 Voulez-vous restaurer les permissions des fichiers et dossiers?\n\nCette action appliquera les permissions correctes pour le fonctionnement de l\'application.')) {
+        return;
+    }
+
+    this.disabled = true;
+    this.textContent = '⏳ Application en cours...';
+
+    try {
+        const response = await fetch('/deploy/apply-permissions', { method: 'POST' });
+        const data = await response.json();
+
+        if (data.success) {
+            alert('✅ ' + data.message);
+        } else {
+            alert('❌ ' + data.error);
+        }
+    } catch (error) {
+        alert('❌ Erreur: ' + error.message);
+    } finally {
+        this.disabled = false;
+        this.textContent = '🔐 Restaurer les permissions';
+    }
 });
 
 function escapeHtml(text) {
@@ -619,5 +782,83 @@ function escapeHtml(text) {
 
 .data-table tbody tr:hover {
     background: #f8f9fa;
+}
+
+/* Formulaire GitHub */
+.github-form {
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.github-form h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #2c3e50;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group label {
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: #2c3e50;
+    font-size: 0.9em;
+}
+
+.form-control {
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: border-color 0.2s;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+/* Alerte info */
+.alert {
+    padding: 15px;
+    border-radius: 4px;
+    margin-bottom: 15px;
+}
+
+.alert-info {
+    background: #d1ecf1;
+    border: 1px solid #bee5eb;
+    color: #0c5460;
+}
+
+.alert strong {
+    display: block;
+    margin-bottom: 5px;
+}
+
+.alert p {
+    margin: 0;
+}
+
+.btn-success {
+    background: #27ae60;
+    color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+    background: #229954;
 }
 </style>

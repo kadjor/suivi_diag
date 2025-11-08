@@ -50,8 +50,13 @@ class AdminController extends Controller
     public function settings()
     {
         // Charger les paramètres depuis la base de données
-        $settingsModel = new \Models\Setting();
-        $settings = $settingsModel->getAllAsArray();
+        try {
+            $settingsModel = new \Models\Setting();
+            $settings = $settingsModel->getAllAsArray();
+        } catch (\Exception $e) {
+            // Si la table n'existe pas encore, utiliser un tableau vide
+            $settings = [];
+        }
 
         // Charger la configuration email depuis le fichier
         $emailConfigFile = __DIR__ . '/../../config/email.php';

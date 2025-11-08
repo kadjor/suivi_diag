@@ -29,14 +29,18 @@ class DeployController extends Controller
      */
     public function index()
     {
-        // Récupérer les informations Git
-        $gitStatus = $this->getGitStatus();
-        $currentBranch = $this->getCurrentBranch();
-        $lastCommits = $this->getLastCommits(10);
-        $hasChanges = $this->hasLocalChanges();
+        // Vérifier si c'est un repo Git
+        $isGitRepo = $this->isGitRepository();
+
+        // Récupérer les informations Git si applicable
+        $gitStatus = $isGitRepo ? $this->getGitStatus() : ['error' => 'Non-Git'];
+        $currentBranch = $isGitRepo ? $this->getCurrentBranch() : 'N/A';
+        $lastCommits = $isGitRepo ? $this->getLastCommits(10) : [];
+        $hasChanges = $isGitRepo ? $this->hasLocalChanges() : false;
         $deployLogs = $this->getDeployLogs(20);
 
         View::render('deploy.index', [
+            'isGitRepo' => $isGitRepo,
             'gitStatus' => $gitStatus,
             'currentBranch' => $currentBranch,
             'lastCommits' => $lastCommits,
@@ -44,6 +48,14 @@ class DeployController extends Controller
             'deployLogs' => $deployLogs,
             'appDir' => $this->appDir
         ]);
+    }
+
+    /**
+     * Vérifie si le répertoire est un dépôt Git
+     */
+    private function isGitRepository()
+    {
+        return is_dir($this->appDir . '/.git');
     }
 
     /**
@@ -444,5 +456,217 @@ class DeployController extends Controller
         $bytes /= pow(1024, $pow);
 
         return round($bytes, $precision) . ' ' . $units[$pow];
+    }
+
+    /**
+     * Télécharge depuis GitHub sans utiliser Git
+     */
+    public function downloadFromGithub()
+    {
+        $this->log('===== TÉLÉCHARGEMENT DEPUIS GITHUB =====');
+        $this->log('Utilisateur: ' . Auth::user()['email']);
+        $this->log('Date: ' . date('Y-m-d H:i:s'));
+
+        $results = [
+            'success' => false,
+            'messages' => [],
+            'errors' => []
+        ];
+
+        try {
+            // Paramètres GitHub (à adapter selon votre configuration)
+            $githubUser = $_POST['github_user'] ?? 'kadjor';
+            $githubRepo = $_POST['github_repo'] ?? 'suivi_diag';
+            $githubBranch = $_POST['github_branch'] ?? 'main';
+
+            $this->log("GitHub: {$githubUser}/{$githubRepo} (branche: {$githubBranch})");
+
+            // 1. Créer un backup
+            $this->log('Création du backup...');
+            $backupResult = $this->createBackup();
+            if (!$backupResult['success']) {
+                throw new \Exception('Échec de la création du backup: ' . $backupResult['error']);
+            }
+            $results['messages'][] = 'Backup créé: ' . $backupResult['file'];
+            $this->log('✓ Backup créé: ' . $backupResult['file']);
+
+            // 2. Télécharger le ZIP depuis GitHub
+            $this->log('Téléchargement depuis GitHub...');
+            $zipUrl = "https://github.com/{$githubUser}/{$githubRepo}/archive/refs/heads/{$githubBranch}.zip";
+            $zipFile = $this->appDir . '/temp_download.zip';
+
+            $ch = curl_init($zipUrl);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 300);
+
+            $zipContent = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($httpCode !== 200 || !$zipContent) {
+                throw new \Exception("Échec du téléchargement (HTTP {$httpCode})");
+            }
+
+            file_put_contents($zipFile, $zipContent);
+            $this->log('✓ Téléchargement terminé');
+            $results['messages'][] = 'Fichiers téléchargés depuis GitHub';
+
+            // 3. Décompresser
+            $this->log('Décompression...');
+            $zip = new \ZipArchive();
+            if ($zip->open($zipFile) !== true) {
+                throw new \Exception('Impossible d\'ouvrir le fichier ZIP');
+            }
+
+            $extractPath = $this->appDir . '/temp_extract';
+            if (!is_dir($extractPath)) {
+                mkdir($extractPath, 0755, true);
+            }
+
+            $zip->extractTo($extractPath);
+            $zip->close();
+            $this->log('✓ Décompression terminée');
+
+            // 4. Copier les fichiers (en excluant certains dossiers)
+            $this->log('Copie des fichiers...');
+            $sourceDir = $extractPath . "/{$githubRepo}-{$githubBranch}";
+
+            $excludes = ['.git', 'backups', 'storage/logs', 'config/database.php', 'config/email.php'];
+            $this->copyDirectory($sourceDir, $this->appDir, $excludes);
+
+            $this->log('✓ Fichiers copiés');
+            $results['messages'][] = 'Fichiers mis à jour';
+
+            // 5. Nettoyer les fichiers temporaires
+            $this->log('Nettoyage...');
+            @unlink($zipFile);
+            $this->deleteDirectory($extractPath);
+            $this->log('✓ Nettoyage terminé');
+
+            // 6. Restaurer les permissions
+            $this->log('Restauration des permissions...');
+            $permissionsResult = $this->restorePermissions();
+            if ($permissionsResult['success']) {
+                $results['messages'][] = 'Permissions restaurées';
+                $this->log('✓ Permissions restaurées');
+            }
+
+            // 7. Vider le cache
+            if (is_dir($this->appDir . '/storage/cache')) {
+                $this->clearCache();
+                $results['messages'][] = 'Cache nettoyé';
+                $this->log('✓ Cache nettoyé');
+            }
+
+            $results['success'] = true;
+            $this->log('===== TÉLÉCHARGEMENT RÉUSSI =====');
+
+        } catch (\Exception $e) {
+            $results['errors'][] = $e->getMessage();
+            $this->log('✗ ERREUR: ' . $e->getMessage());
+            $this->log('===== TÉLÉCHARGEMENT ÉCHOUÉ =====');
+        }
+
+        View::json($results);
+    }
+
+    /**
+     * Copie un répertoire récursivement en excluant certains fichiers
+     */
+    private function copyDirectory($source, $dest, $excludes = [])
+    {
+        if (!is_dir($source)) {
+            return;
+        }
+
+        $dir = opendir($source);
+        while (($file = readdir($dir)) !== false) {
+            if ($file === '.' || $file === '..') {
+                continue;
+            }
+
+            // Vérifier les exclusions
+            $excluded = false;
+            foreach ($excludes as $exclude) {
+                if (strpos($source . '/' . $file, $exclude) !== false) {
+                    $excluded = true;
+                    break;
+                }
+            }
+
+            if ($excluded) {
+                continue;
+            }
+
+            $srcPath = $source . '/' . $file;
+            $destPath = $dest . '/' . $file;
+
+            if (is_dir($srcPath)) {
+                if (!is_dir($destPath)) {
+                    mkdir($destPath, 0755, true);
+                }
+                $this->copyDirectory($srcPath, $destPath, $excludes);
+            } else {
+                copy($srcPath, $destPath);
+            }
+        }
+        closedir($dir);
+    }
+
+    /**
+     * Supprime un répertoire récursivement
+     */
+    private function deleteDirectory($dir)
+    {
+        if (!is_dir($dir)) {
+            return;
+        }
+
+        $items = scandir($dir);
+        foreach ($items as $item) {
+            if ($item === '.' || $item === '..') {
+                continue;
+            }
+
+            $path = $dir . '/' . $item;
+            if (is_dir($path)) {
+                $this->deleteDirectory($path);
+            } else {
+                @unlink($path);
+            }
+        }
+        @rmdir($dir);
+    }
+
+    /**
+     * Applique les permissions uniquement (endpoint public)
+     */
+    public function applyPermissions()
+    {
+        $this->log('===== APPLICATION DES PERMISSIONS =====');
+        $this->log('Utilisateur: ' . Auth::user()['email']);
+
+        try {
+            $result = $this->restorePermissions();
+
+            if ($result['success']) {
+                $this->log('✓ Permissions appliquées avec succès');
+                View::json([
+                    'success' => true,
+                    'message' => 'Permissions restaurées avec succès'
+                ]);
+            } else {
+                throw new \Exception($result['error']);
+            }
+
+        } catch (\Exception $e) {
+            $this->log('✗ Erreur: ' . $e->getMessage());
+            View::json([
+                'success' => false,
+                'error' => $e->getMessage()
+            ], 400);
+        }
     }
 }
