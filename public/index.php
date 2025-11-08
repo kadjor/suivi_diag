@@ -208,6 +208,7 @@ $router->post('/deploy/apply-permissions', 'Controllers\DeployController@applyPe
 $router->get('/deploy/diff', 'Controllers\DeployController@diff');
 $router->post('/deploy/reset', 'Controllers\DeployController@reset');
 $router->get('/deploy/backups', 'Controllers\DeployController@backups');
+$router->get('/deploy/migrations-diagnostic', 'Controllers\DeployController@migrationsDiagnostic');
 $router->get('/deploy/migrations', 'Controllers\DeployController@migrations');
 $router->post('/deploy/run-migrations', 'Controllers\DeployController@runMigrations');
 $router->post('/deploy/reset-migrations', 'Controllers\DeployController@resetMigrations');

@@ -671,62 +671,160 @@ class DeployController extends Controller
     }
 
     /**
+     * Diagnostic - voir le contenu brut retourné
+     */
+    public function migrationsDiagnostic()
+    {
+        // Désactiver TOUTE sortie automatique
+        @ini_set('display_errors', '0');
+        error_reporting(0);
+
+        // Nettoyer TOUT
+        while (ob_get_level()) {
+            ob_end_clean();
+        }
+
+        echo "=== DIAGNOSTIC MIGRATIONS ===\n\n";
+
+        try {
+            $migrationsDir = $this->appDir . '/database/migrations';
+            echo "Répertoire migrations: $migrationsDir\n";
+            echo "Existe: " . (is_dir($migrationsDir) ? 'OUI' : 'NON') . "\n\n";
+
+            if (is_dir($migrationsDir)) {
+                $files = glob($migrationsDir . '/*.sql');
+                echo "Nombre de fichiers: " . count($files) . "\n";
+                echo "Fichiers trouvés:\n";
+                foreach ($files as $file) {
+                    echo "  - " . basename($file) . "\n";
+                }
+            }
+
+            echo "\n=== TEST CONNEXION DB ===\n";
+            $db = \Core\Database::getInstance()->getConnection();
+            echo "Connexion DB: OK\n";
+
+            echo "\n=== FIN DIAGNOSTIC ===\n";
+
+        } catch (\Exception $e) {
+            echo "ERREUR: " . $e->getMessage() . "\n";
+            echo "Trace: " . $e->getTraceAsString() . "\n";
+        }
+
+        exit;
+    }
+
+    /**
      * Liste les migrations disponibles
      */
     public function migrations()
     {
+        // Désactiver l'affichage des erreurs pour éviter pollution JSON
+        @ini_set('display_errors', '0');
+        @ini_set('log_errors', '1');
+        error_reporting(E_ALL);
+
+        // Nettoyer ABSOLUMENT TOUT
+        while (@ob_end_clean());
+
+        // Démarrer un nouveau buffer propre
+        ob_start();
+
         try {
-            // Nettoyer TOUS les buffers de sortie
-            while (ob_get_level()) {
-                ob_end_clean();
-            }
-
-            // Démarrer un nouveau buffer
-            ob_start();
-
             $migrationsDir = $this->appDir . '/database/migrations';
             $migrations = [];
 
             if (!is_dir($migrationsDir)) {
                 ob_end_clean();
-                View::json(['migrations' => []]);
-                return;
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['migrations' => [], 'debug' => 'dir not found']);
+                exit;
             }
 
-            $files = glob($migrationsDir . '/*.sql');
+            $files = @glob($migrationsDir . '/*.sql');
 
-            if ($files === false) {
+            if ($files === false || $files === null) {
                 ob_end_clean();
-                View::json(['migrations' => []]);
-                return;
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['migrations' => [], 'debug' => 'glob failed']);
+                exit;
             }
 
             sort($files);
 
             foreach ($files as $file) {
                 $name = basename($file);
+                $executed = false;
+
+                // Vérifier si exécutée SANS générer d'erreurs
+                try {
+                    $executed = $this->isMigrationExecutedSafe($name);
+                } catch (\Exception $e) {
+                    // Ignorer silencieusement les erreurs de vérification
+                }
+
                 $migrations[] = [
                     'name' => $name,
                     'path' => $file,
-                    'size' => $this->formatBytes(filesize($file)),
-                    'executed' => $this->isMigrationExecuted($name)
+                    'size' => $this->formatBytes(@filesize($file) ?: 0),
+                    'executed' => $executed
                 ];
             }
 
+            // Nettoyer le buffer
             ob_end_clean();
-            View::json(['migrations' => $migrations]);
+
+            // Envoyer le JSON
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['migrations' => $migrations, 'success' => true]);
+            exit;
 
         } catch (\Exception $e) {
-            // Nettoyer TOUS les buffers
-            while (ob_get_level()) {
-                ob_end_clean();
-            }
+            // Nettoyer TOUT
+            while (@ob_end_clean());
 
             $this->log('✗ Erreur liste migrations: ' . $e->getMessage());
-            View::json([
+
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode([
                 'error' => $e->getMessage(),
-                'migrations' => []
-            ], 500);
+                'migrations' => [],
+                'success' => false
+            ]);
+            exit;
+        }
+    }
+
+    /**
+     * Version sécurisée de isMigrationExecuted qui ne génère pas d'erreurs
+     */
+    private function isMigrationExecutedSafe($migrationName)
+    {
+        try {
+            $db = \Core\Database::getInstance()->getConnection();
+
+            // Vérifier si la table migrations existe
+            $result = @$db->query("SHOW TABLES LIKE 'migrations'");
+
+            if (!$result || $result->num_rows === 0) {
+                // Table n'existe pas - ne pas la créer ici pour éviter les sorties
+                return false;
+            }
+
+            // Vérifier si cette migration a été exécutée
+            $stmt = @$db->prepare("SELECT id FROM migrations WHERE migration = ? LIMIT 1");
+            if (!$stmt) {
+                return false;
+            }
+
+            $stmt->bind_param('s', $migrationName);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            return $result && $result->num_rows > 0;
+
+        } catch (\Exception $e) {
+            return false;
         }
     }
 
