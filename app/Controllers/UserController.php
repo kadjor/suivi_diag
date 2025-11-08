@@ -45,12 +45,14 @@ class UserController extends Controller
         $userId = Auth::id();
         $data = $_POST;
 
-        $validator = new Validator($data);
-        $validator->required(['first_name', 'last_name', 'email']);
-        $validator->email('email');
+        $validator = new Validator($data, [
+            'first_name' => 'required',
+            'last_name' => 'required',
+            'email' => 'required|email'
+        ]);
 
-        if (!$validator->validate()) {
-            Session::flash('error', implode(', ', $validator->getErrors()));
+        if ($validator->fails()) {
+            Session::flash('error', implode(', ', $validator->allErrors()));
             View::redirect('/profile');
         }
 
@@ -131,12 +133,17 @@ class UserController extends Controller
 
         $data = $_POST;
 
-        $validator = new Validator($data);
-        $validator->required(['username', 'email', 'password', 'first_name', 'last_name', 'role_id']);
-        $validator->email('email');
+        $validator = new Validator($data, [
+            'username' => 'required',
+            'email' => 'required|email',
+            'password' => 'required',
+            'first_name' => 'required',
+            'last_name' => 'required',
+            'role_id' => 'required'
+        ]);
 
-        if (!$validator->validate()) {
-            Session::flash('error', implode(', ', $validator->getErrors()));
+        if ($validator->fails()) {
+            Session::flash('error', implode(', ', $validator->allErrors()));
             View::redirect('/users/create');
         }
 
@@ -212,12 +219,16 @@ class UserController extends Controller
 
         $data = $_POST;
 
-        $validator = new Validator($data);
-        $validator->required(['username', 'email', 'first_name', 'last_name', 'role_id']);
-        $validator->email('email');
+        $validator = new Validator($data, [
+            'username' => 'required',
+            'email' => 'required|email',
+            'first_name' => 'required',
+            'last_name' => 'required',
+            'role_id' => 'required'
+        ]);
 
-        if (!$validator->validate()) {
-            Session::flash('error', implode(', ', $validator->getErrors()));
+        if ($validator->fails()) {
+            Session::flash('error', implode(', ', $validator->allErrors()));
             View::redirect('/users/' . $id . '/edit');
         }
 

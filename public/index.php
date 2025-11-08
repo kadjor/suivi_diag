@@ -189,6 +189,7 @@ $router->get('/admin', 'Controllers\AdminController@index');
 $router->get('/admin/users', 'Controllers\AdminController@users');
 $router->get('/admin/settings', 'Controllers\AdminController@settings');
 $router->post('/admin/settings', 'Controllers\AdminController@updateSettings');
+$router->post('/admin/test-email', 'Controllers\AdminController@testEmail');
 $router->get('/admin/audit-logs', 'Controllers\AdminController@auditLogs');
 $router->get('/admin/referentials', 'Controllers\AdminController@referentials');
 $router->get('/admin/statuses', 'Controllers\AdminController@statuses');

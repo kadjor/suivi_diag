@@ -72,7 +72,7 @@ class Intervention extends Model
                 FROM interventions i
                 LEFT JOIN users u ON i.technician_id = u.id
                 WHERE i.order_id = ?
-                ORDER BY i.scheduled_date DESC, i.scheduled_time DESC";
+                ORDER BY i.scheduled_date DESC";
 
         return $this->query($sql, [$orderId]);
     }

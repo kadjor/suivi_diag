@@ -49,15 +49,61 @@ class AdminController extends Controller
 
     public function settings()
     {
-        $config = require __DIR__ . '/../../config/app.php';
-        View::render('admin.settings', ['config' => $config]);
+        // Charger les paramètres depuis la base de données
+        $settingsModel = new \Models\Setting();
+        $settings = $settingsModel->getAllAsArray();
+
+        View::render('admin.settings', ['settings' => $settings]);
     }
 
     public function updateSettings()
     {
-        // TODO: Implémenter la mise à jour des paramètres
-        Session::flash('success', 'Paramètres mis à jour');
+        if (!Auth::can('manage_settings')) {
+            Session::flash('error', 'Accès refusé');
+            View::redirect('/dashboard');
+        }
+
+        try {
+            $settingsModel = new \Models\Setting();
+            $data = $_POST;
+
+            // Sauvegarder chaque paramètre
+            foreach ($data as $key => $value) {
+                $settingsModel->set($key, $value);
+            }
+
+            Session::flash('success', 'Paramètres mis à jour avec succès');
+        } catch (\Exception $e) {
+            Session::flash('error', 'Erreur lors de la mise à jour : ' . $e->getMessage());
+        }
+
         View::redirect('/admin/settings');
+    }
+
+    public function testEmail()
+    {
+        if (!Auth::can('manage_settings')) {
+            View::json(['error' => 'Accès refusé'], 403);
+        }
+
+        $email = $_POST['email'] ?? Auth::user()['email'];
+
+        try {
+            $emailService = new \Services\EmailService();
+            $result = $emailService->send(
+                $email,
+                'Test d\'envoi d\'email - D-Evidences',
+                '<h2>Email de test</h2><p>Si vous recevez cet email, la configuration email fonctionne correctement !</p><p>Date : ' . date('d/m/Y H:i:s') . '</p>'
+            );
+
+            if ($result) {
+                View::json(['success' => true, 'message' => 'Email de test envoyé à ' . $email]);
+            } else {
+                View::json(['error' => 'Échec de l\'envoi'], 400);
+            }
+        } catch (\Exception $e) {
+            View::json(['error' => $e->getMessage()], 400);
+        }
     }
 
     public function referentials()
