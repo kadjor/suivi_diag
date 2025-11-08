@@ -136,6 +136,8 @@ $router->get('/sites', 'Controllers\SiteController@index');
 $router->get('/sites/create', 'Controllers\SiteController@create');
 $router->post('/sites/store', 'Controllers\SiteController@store');
 $router->get('/sites/{id}', 'Controllers\SiteController@show');
+$router->get('/sites/{id}/edit', 'Controllers\SiteController@edit');
+$router->post('/sites/{id}/update', 'Controllers\SiteController@update');
 
 // Routes protégées - Clients
 $router->get('/clients', 'Controllers\ClientController@index');

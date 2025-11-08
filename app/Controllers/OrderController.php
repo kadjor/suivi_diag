@@ -58,7 +58,7 @@ class OrderController extends Controller
      */
     public function show($id)
     {
-        $order = $this->orderModel->find($id);
+        $order = $this->orderModel->getWithDetails($id);
 
         if (!$order) {
             Session::flash('error', 'Commande introuvable');

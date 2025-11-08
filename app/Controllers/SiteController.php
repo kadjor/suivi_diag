@@ -40,7 +40,13 @@ class SiteController extends Controller
             View::redirect('/sites');
         }
 
-        View::render('sites.show', ['site' => $site]);
+        $diagnosticModel = new \Models\Diagnostic();
+        $diagnostics = $diagnosticModel->getBySite($id);
+
+        View::render('sites.show', [
+            'site' => $site,
+            'diagnostics' => $diagnostics
+        ]);
     }
 
     public function create()
@@ -79,17 +85,55 @@ class SiteController extends Controller
         }
     }
 
+    public function edit($id)
+    {
+        if (!Auth::can('manage_sites')) {
+            Session::flash('error', 'Accès refusé');
+            View::redirect('/sites');
+        }
+
+        $site = $this->siteModel->find($id);
+        if (!$site) {
+            Session::flash('error', 'Site introuvable');
+            View::redirect('/sites');
+        }
+
+        $clientModel = new Client();
+        View::render('sites.edit', [
+            'site' => $site,
+            'clients' => $clientModel->getAll()
+        ]);
+    }
+
     public function update($id)
     {
         if (!Auth::can('manage_sites')) {
-            View::json(['error' => 'Accès refusé'], 403);
+            Session::flash('error', 'Accès refusé');
+            View::redirect('/sites');
+        }
+
+        $site = $this->siteModel->find($id);
+        if (!$site) {
+            Session::flash('error', 'Site introuvable');
+            View::redirect('/sites');
+        }
+
+        $data = $_POST;
+        $validator = new Validator($data);
+        $validator->required(['name', 'address', 'client_id']);
+
+        if (!$validator->validate()) {
+            Session::flash('error', implode(', ', $validator->getErrors()));
+            View::redirect('/sites/' . $id . '/edit');
         }
 
         try {
-            $this->siteModel->update($id, $_POST);
-            View::json(['success' => true]);
+            $this->siteModel->update($id, $data);
+            Session::flash('success', 'Site mis à jour avec succès');
+            View::redirect('/sites/' . $id);
         } catch (\Exception $e) {
-            View::json(['error' => $e->getMessage()], 400);
+            Session::flash('error', 'Erreur lors de la mise à jour : ' . $e->getMessage());
+            View::redirect('/sites/' . $id . '/edit');
         }
     }
 }
