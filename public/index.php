@@ -150,6 +150,7 @@ $router->post('/reports/import-excel', 'Controllers\ReportController@importExcel
 $router->post('/reports/confirm-import', 'Controllers\ReportController@confirmImport');
 
 // Routes protégées - Messages
+$router->get('/messages', 'Controllers\MessageController@index');
 $router->get('/orders/{id}/messages', 'Controllers\MessageController@index');
 $router->post('/orders/{id}/messages', 'Controllers\MessageController@store');
 
