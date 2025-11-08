@@ -34,4 +34,12 @@ class Client extends Model
                 ORDER BY c.organization_name";
         return $this->query($sql);
     }
+
+    /**
+     * Alias pour correspondre aux autres appels
+     */
+    public function all()
+    {
+        return $this->getAll();
+    }
 }

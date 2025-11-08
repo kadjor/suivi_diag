@@ -98,4 +98,55 @@ class ReportController extends Controller
         readfile($filePath);
         exit;
     }
+
+    /**
+     * Import de données depuis Excel
+     */
+    public function importExcel()
+    {
+        if (!Auth::can('manage_reports')) {
+            View::json(['error' => 'Accès refusé'], 403);
+        }
+
+        if (!isset($_FILES['excel_file'])) {
+            View::json(['error' => 'Fichier manquant'], 400);
+        }
+
+        $file = $_FILES['excel_file'];
+
+        // Vérifier le type de fichier
+        $allowedTypes = ['application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
+        if (!in_array($file['type'], $allowedTypes)) {
+            View::json(['error' => 'Format de fichier invalide'], 400);
+        }
+
+        try {
+            // TODO: Implémenter le parsing Excel avec PhpSpreadsheet
+            // Pour l'instant, retourner un message
+            View::json([
+                'success' => true,
+                'message' => 'Import Excel à implémenter',
+                'preview' => []
+            ]);
+
+        } catch (\Exception $e) {
+            View::json(['error' => $e->getMessage()], 400);
+        }
+    }
+
+    /**
+     * Confirmer l'import de données
+     */
+    public function confirmImport()
+    {
+        if (!Auth::can('manage_reports')) {
+            View::json(['error' => 'Accès refusé'], 403);
+        }
+
+        // TODO: Implémenter la confirmation d'import
+        View::json([
+            'success' => true,
+            'message' => 'Confirmation d\'import à implémenter'
+        ]);
+    }
 }

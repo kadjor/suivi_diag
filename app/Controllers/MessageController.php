@@ -63,4 +63,16 @@ class MessageController extends Controller
         $messages = $this->messageModel->getByOrder($orderId);
         View::json(['messages' => $messages]);
     }
+
+    /**
+     * Alias pour send() - pour correspondre à la route store
+     */
+    public function store($orderId = null)
+    {
+        // Si l'orderId vient de l'URL (route), l'utiliser
+        if ($orderId) {
+            $_POST['order_id'] = $orderId;
+        }
+        return $this->send();
+    }
 }

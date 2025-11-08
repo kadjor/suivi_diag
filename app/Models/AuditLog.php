@@ -23,4 +23,14 @@ class AuditLog extends Model
             'result' => $result
         ]);
     }
+
+    public function getRecent($limit = 100)
+    {
+        $sql = "SELECT a.*, u.username, u.first_name, u.last_name
+                FROM audit_log a
+                LEFT JOIN users u ON a.user_id = u.id
+                ORDER BY a.timestamp DESC
+                LIMIT ?";
+        return $this->query($sql, [$limit]);
+    }
 }

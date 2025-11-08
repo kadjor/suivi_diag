@@ -35,4 +35,20 @@ class Diagnostic extends Model
 
         return $this->query($sql, [$clientId]);
     }
+
+    /**
+     * Récupère les diagnostics d'un site
+     */
+    public function getBySite($siteId)
+    {
+        $sql = "SELECT d.*, dt.name as type_name, dt.code as type_code, dt.color as type_color,
+                st.label as status_label, st.color as status_color
+                FROM diagnostics d
+                LEFT JOIN diagnostic_types dt ON d.diagnostic_type_id = dt.id
+                LEFT JOIN statuses st ON d.status = st.code AND st.category = 'diagnostic'
+                WHERE d.site_id = ?
+                ORDER BY d.date DESC";
+
+        return $this->query($sql, [$siteId]);
+    }
 }

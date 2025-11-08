@@ -80,4 +80,39 @@ class Site extends Model
     {
         return $this->getAllWithDiagnostics();
     }
+
+    /**
+     * Récupère les sites avec diagnostics selon des filtres
+     */
+    public function getWithDiagnostics($filters = [])
+    {
+        $where = [];
+        $params = [];
+
+        if (!empty($filters['client_id'])) {
+            $where[] = "s.client_id = ?";
+            $params[] = $filters['client_id'];
+        }
+
+        if (!empty($filters['diagnostic_type'])) {
+            $where[] = "d.diagnostic_type_id = ?";
+            $params[] = $filters['diagnostic_type'];
+        }
+
+        $whereClause = !empty($where) ? "WHERE " . implode(' AND ', $where) : "";
+
+        $sql = "SELECT s.*, c.organization_name as client_name,
+                s.latitude, s.longitude,
+                COUNT(DISTINCT d.id) as diagnostics_count,
+                MAX(d.date) as last_diagnostic_date
+                FROM sites s
+                LEFT JOIN clients c ON s.client_id = c.id
+                LEFT JOIN diagnostics d ON s.id = d.site_id
+                {$whereClause}
+                GROUP BY s.id
+                HAVING s.latitude IS NOT NULL AND s.longitude IS NOT NULL
+                ORDER BY s.name";
+
+        return $this->query($sql, $params);
+    }
 }

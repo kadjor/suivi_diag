@@ -8,6 +8,7 @@ use Core\View;
 use Models\Order;
 use Models\Site;
 use Models\Diagnostic;
+use Models\Intervention;
 
 class ExportController extends Controller
 {
@@ -51,6 +52,55 @@ class ExportController extends Controller
             $this->exportToExcel($sites, 'sites');
         } else {
             $this->exportToCsv($sites, 'sites');
+        }
+    }
+
+    public function interventions()
+    {
+        if (!Auth::can('export_data')) {
+            View::json(['error' => 'Accès refusé'], 403);
+        }
+
+        $format = $_GET['format'] ?? 'xlsx';
+        $interventionModel = new Intervention();
+        $interventions = $interventionModel->query(
+            "SELECT i.*, o.order_number, s.name as site_name,
+                    u.first_name as tech_first_name, u.last_name as tech_last_name
+             FROM interventions i
+             LEFT JOIN orders o ON i.order_id = o.id
+             LEFT JOIN sites s ON i.site_id = s.id
+             LEFT JOIN users u ON i.technician_id = u.id
+             ORDER BY i.scheduled_date DESC"
+        );
+
+        if ($format === 'xlsx') {
+            $this->exportToExcel($interventions, 'interventions');
+        } else {
+            $this->exportToCsv($interventions, 'interventions');
+        }
+    }
+
+    public function diagnostics()
+    {
+        if (!Auth::can('export_data')) {
+            View::json(['error' => 'Accès refusé'], 403);
+        }
+
+        $format = $_GET['format'] ?? 'xlsx';
+        $diagnosticModel = new Diagnostic();
+        $diagnostics = $diagnosticModel->query(
+            "SELECT d.*, s.name as site_name, s.address as site_address,
+                    c.organization_name as client_name
+             FROM diagnostics d
+             LEFT JOIN sites s ON d.site_id = s.id
+             LEFT JOIN clients c ON s.client_id = c.id
+             ORDER BY d.date DESC"
+        );
+
+        if ($format === 'xlsx') {
+            $this->exportToExcel($diagnostics, 'diagnostics');
+        } else {
+            $this->exportToCsv($diagnostics, 'diagnostics');
         }
     }
 

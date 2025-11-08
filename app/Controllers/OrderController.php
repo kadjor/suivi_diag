@@ -11,6 +11,7 @@ use Models\Client;
 use Models\Site;
 use Models\OrderEvent;
 use Models\AuditLog;
+use Models\User;
 use Helpers\Validator;
 
 /**
@@ -235,6 +236,188 @@ class OrderController extends Controller
         } catch (\Exception $e) {
             Session::flash('error', 'Erreur lors de la suppression');
             View::redirect('/orders');
+        }
+    }
+
+    /**
+     * Formulaire de modification
+     */
+    public function edit($id)
+    {
+        $order = $this->orderModel->find($id);
+
+        if (!$order) {
+            Session::flash('error', 'Commande introuvable');
+            View::redirect('/orders');
+        }
+
+        if (!Auth::can('manage_orders')) {
+            Session::flash('error', 'Accès refusé');
+            View::redirect('/orders');
+        }
+
+        $clientModel = new Client();
+        $siteModel = new Site();
+        $userModel = new User();
+
+        View::render('orders.edit', [
+            'order' => $order,
+            'clients' => $clientModel->getAll(),
+            'sites' => $siteModel->getAll(),
+            'technicians' => $userModel->query("SELECT * FROM users WHERE role_id IN (SELECT id FROM roles WHERE name = 'technicien') AND active = 1")
+        ]);
+    }
+
+    /**
+     * Mettre à jour une commande
+     */
+    public function update($id)
+    {
+        if (!Auth::can('manage_orders')) {
+            Session::flash('error', 'Accès refusé');
+            View::redirect('/orders');
+        }
+
+        $order = $this->orderModel->find($id);
+
+        if (!$order) {
+            Session::flash('error', 'Commande introuvable');
+            View::redirect('/orders');
+        }
+
+        $data = $_POST;
+
+        $validator = new Validator($data);
+        $validator->required(['client_id', 'site_id', 'order_date']);
+
+        if (!$validator->validate()) {
+            Session::flash('error', implode(', ', $validator->getErrors()));
+            View::redirect('/orders/' . $id . '/edit');
+        }
+
+        try {
+            $this->orderModel->update($id, [
+                'client_id' => $data['client_id'],
+                'site_id' => $data['site_id'],
+                'order_date' => $data['order_date'],
+                'desired_date' => $data['desired_date'] ?? null,
+                'assigned_to' => $data['assigned_to'] ?? null,
+                'description' => $data['description'] ?? null,
+                'notes' => $data['notes'] ?? null
+            ]);
+
+            $eventModel = new OrderEvent();
+            $eventModel->create([
+                'order_id' => $id,
+                'event_type' => 'updated',
+                'user_id' => Auth::id(),
+                'description' => "Commande mise à jour"
+            ]);
+
+            Session::flash('success', 'Commande mise à jour avec succès');
+            View::redirect('/orders/' . $id);
+
+        } catch (\Exception $e) {
+            Session::flash('error', 'Erreur lors de la mise à jour : ' . $e->getMessage());
+            View::redirect('/orders/' . $id . '/edit');
+        }
+    }
+
+    /**
+     * Alias pour assignTechnician (pour correspondre à la route)
+     */
+    public function assign($id)
+    {
+        return $this->assignTechnician($id);
+    }
+
+    /**
+     * Clôturer une commande
+     */
+    public function close($id)
+    {
+        if (!Auth::can('manage_orders')) {
+            View::json(['error' => 'Accès refusé'], 403);
+        }
+
+        $order = $this->orderModel->find($id);
+
+        if (!$order) {
+            View::json(['error' => 'Commande introuvable'], 404);
+        }
+
+        try {
+            // Mettre à jour le statut vers "terminé"
+            $this->orderModel->query(
+                "UPDATE orders SET status_id = (SELECT id FROM statuses WHERE code = 'completed' LIMIT 1) WHERE id = ?",
+                [$id]
+            );
+
+            $eventModel = new OrderEvent();
+            $eventModel->create([
+                'order_id' => $id,
+                'event_type' => 'closed',
+                'user_id' => Auth::id(),
+                'description' => "Commande clôturée"
+            ]);
+
+            Session::flash('success', 'Commande clôturée avec succès');
+            View::json(['success' => true, 'redirect' => '/orders/' . $id]);
+
+        } catch (\Exception $e) {
+            View::json(['error' => $e->getMessage()], 400);
+        }
+    }
+
+    /**
+     * Afficher la timeline d'une commande
+     */
+    public function timeline($id)
+    {
+        $order = $this->orderModel->find($id);
+
+        if (!$order) {
+            View::json(['error' => 'Commande introuvable'], 404);
+        }
+
+        // Vérifier les permissions
+        $user = Auth::user();
+        if ($user['role_name'] === 'client' && $order['client_id'] != $user['client_id']) {
+            View::json(['error' => 'Accès refusé'], 403);
+        }
+
+        $orderEventModel = new OrderEvent();
+        $events = $orderEventModel->getByOrder($id);
+
+        View::json(['events' => $events]);
+    }
+
+    /**
+     * Générer un accusé de réception (AR)
+     */
+    public function generateAcknowledgment($id)
+    {
+        if (!Auth::can('manage_orders')) {
+            Session::flash('error', 'Accès refusé');
+            View::redirect('/orders');
+        }
+
+        $order = $this->orderModel->find($id);
+
+        if (!$order) {
+            Session::flash('error', 'Commande introuvable');
+            View::redirect('/orders');
+        }
+
+        try {
+            // TODO: Implémenter la génération PDF avec TCPDF ou similaire
+            // Pour l'instant, on retourne un message
+            Session::flash('info', 'Génération d\'AR à implémenter');
+            View::redirect('/orders/' . $id);
+
+        } catch (\Exception $e) {
+            Session::flash('error', 'Erreur lors de la génération : ' . $e->getMessage());
+            View::redirect('/orders/' . $id);
         }
     }
 }

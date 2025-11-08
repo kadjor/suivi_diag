@@ -73,4 +73,12 @@ class CalendarController extends Controller
             View::json(['error' => $e->getMessage()], 400);
         }
     }
+
+    /**
+     * Alias pour getEvents() - pour correspondre à la route
+     */
+    public function events()
+    {
+        return $this->getEvents();
+    }
 }

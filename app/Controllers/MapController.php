@@ -58,4 +58,20 @@ class MapController extends Controller
             'diagnostics' => $diagnostics
         ]);
     }
+
+    /**
+     * Alias pour getSites() - pour correspondre à la route
+     */
+    public function getData()
+    {
+        return $this->getSites();
+    }
+
+    /**
+     * Alias pour getSiteDetails() - pour correspondre à la route
+     */
+    public function siteDetails($id)
+    {
+        return $this->getSiteDetails($id);
+    }
 }
