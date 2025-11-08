@@ -183,12 +183,11 @@ $router->post('/profile/change-password', 'Controllers\UserController@changePass
 
 // Routes protégées - Administration
 $router->get('/admin', 'Controllers\AdminController@index');
+$router->get('/admin/users', 'Controllers\AdminController@users');
 $router->get('/admin/settings', 'Controllers\AdminController@settings');
-$router->post('/admin/settings', 'Controllers\AdminController@saveSettings');
-$router->get('/admin/audit', 'Controllers\AdminController@audit');
-$router->get('/admin/audit/export', 'Controllers\AdminController@exportAudit');
+$router->post('/admin/settings', 'Controllers\AdminController@updateSettings');
+$router->get('/admin/audit-logs', 'Controllers\AdminController@auditLogs');
 $router->get('/admin/referentials', 'Controllers\AdminController@referentials');
-$router->post('/admin/referentials', 'Controllers\AdminController@saveReferential');
 
 // Routes protégées - Exports
 $router->get('/export/orders', 'Controllers\ExportController@orders');

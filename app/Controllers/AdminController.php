@@ -58,4 +58,14 @@ class AdminController extends Controller
         Session::flash('success', 'Paramètres mis à jour');
         View::redirect('/admin/settings');
     }
+
+    public function referentials()
+    {
+        // Get all referential data
+        $roleModel = new \Models\Role();
+
+        View::render('admin.referentials', [
+            'roles' => $roleModel->all()
+        ]);
+    }
 }
