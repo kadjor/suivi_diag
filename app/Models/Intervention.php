@@ -60,4 +60,37 @@ class Intervention extends Model
 
         return $this->query($sql, [$technicianId, $days]);
     }
+
+    /**
+     * Récupère les interventions pour une commande spécifique
+     */
+    public function getByOrderId($orderId)
+    {
+        $sql = "SELECT i.*,
+                       u.first_name as technician_first_name,
+                       u.last_name as technician_last_name
+                FROM interventions i
+                LEFT JOIN users u ON i.technician_id = u.id
+                WHERE i.order_id = ?
+                ORDER BY i.scheduled_date DESC, i.scheduled_time DESC";
+
+        return $this->query($sql, [$orderId]);
+    }
+
+    /**
+     * Crée une nouvelle intervention
+     */
+    public function createIntervention($data)
+    {
+        return $this->create([
+            'order_id' => $data['order_id'],
+            'technician_id' => $data['technician_id'] ?? null,
+            'scheduled_date' => $data['scheduled_date'],
+            'scheduled_time' => $data['scheduled_time'] ?? null,
+            'duration' => $data['duration'] ?? 60,
+            'type' => $data['type'] ?? 'diagnostic',
+            'description' => $data['description'] ?? null,
+            'status' => 'scheduled'
+        ]);
+    }
 }

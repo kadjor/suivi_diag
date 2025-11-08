@@ -119,11 +119,14 @@ class SiteController extends Controller
         }
 
         $data = $_POST;
-        $validator = new Validator($data);
-        $validator->required(['name', 'address', 'client_id']);
+        $validator = new Validator($data, [
+            'name' => 'required',
+            'address' => 'required',
+            'client_id' => 'required'
+        ]);
 
-        if (!$validator->validate()) {
-            Session::flash('error', implode(', ', $validator->getErrors()));
+        if ($validator->fails()) {
+            Session::flash('error', implode(', ', $validator->allErrors()));
             View::redirect('/sites/' . $id . '/edit');
         }
 

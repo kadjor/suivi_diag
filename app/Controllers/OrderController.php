@@ -73,10 +73,16 @@ class OrderController extends Controller
         }
 
         $orderEventModel = new OrderEvent();
+        $reportModel = new \Models\Report();
+        $interventionModel = new \Models\Intervention();
+        $userModel = new \Models\User();
 
         View::render('orders.show', [
             'order' => $order,
             'events' => $orderEventModel->getByOrder($id),
+            'reports' => $reportModel->getByOrderId($id),
+            'interventions' => $interventionModel->getByOrderId($id),
+            'technicians' => $userModel->getByRole('technicien'),
             'can_edit' => Auth::can('manage_orders')
         ]);
     }

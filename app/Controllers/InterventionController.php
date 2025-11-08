@@ -55,6 +55,41 @@ class InterventionController extends Controller
     }
 
     /**
+     * Créer une intervention
+     */
+    public function create()
+    {
+        if (!Auth::can('manage_interventions')) {
+            View::json(['error' => 'Accès refusé'], 403);
+        }
+
+        $data = $_POST;
+
+        if (empty($data['order_id']) || empty($data['scheduled_date'])) {
+            View::json(['error' => 'Données manquantes'], 400);
+        }
+
+        try {
+            $interventionId = $this->interventionModel->createIntervention($data);
+
+            // Créer un événement pour la commande
+            $eventModel = new OrderEvent();
+            $eventModel->create([
+                'order_id' => $data['order_id'],
+                'event_type' => 'intervention_scheduled',
+                'user_id' => Auth::id(),
+                'description' => "Intervention planifiée pour le " . date('d/m/Y', strtotime($data['scheduled_date']))
+            ]);
+
+            Session::flash('success', 'Intervention créée avec succès');
+            View::json(['success' => true, 'intervention_id' => $interventionId]);
+
+        } catch (\Exception $e) {
+            View::json(['error' => $e->getMessage()], 400);
+        }
+    }
+
+    /**
      * Mettre à jour le statut d'une intervention
      */
     public function updateStatus()

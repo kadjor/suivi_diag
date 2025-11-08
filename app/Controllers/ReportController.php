@@ -25,11 +25,23 @@ class ReportController extends Controller
     public function index()
     {
         $user = Auth::user();
-        $reports = $user['role_name'] === 'client'
-            ? $this->reportModel->getByClient($user['client_id'])
-            : $this->reportModel->getAll();
+        $searchTerm = $_GET['search'] ?? '';
 
-        View::render('reports.index', ['reports' => $reports]);
+        if ($searchTerm) {
+            $reports = $this->reportModel->search($searchTerm);
+        } else {
+            $reports = $user['role_name'] === 'client'
+                ? $this->reportModel->getByClient($user['client_id'])
+                : $this->reportModel->getAll();
+        }
+
+        $stats = $this->reportModel->getStats();
+
+        View::render('reports.index', [
+            'reports' => $reports,
+            'stats' => $stats,
+            'searchTerm' => $searchTerm
+        ]);
     }
 
     public function upload()
