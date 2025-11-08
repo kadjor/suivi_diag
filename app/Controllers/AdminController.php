@@ -9,6 +9,7 @@ use Core\Session;
 use Models\User;
 use Models\Client;
 use Models\AuditLog;
+use Models\Status;
 
 class AdminController extends Controller
 {
@@ -67,5 +68,39 @@ class AdminController extends Controller
         View::render('admin.referentials', [
             'roles' => $roleModel->all()
         ]);
+    }
+
+    public function statuses()
+    {
+        $statusModel = new Status();
+        $statuses = $statusModel->getAllGrouped();
+
+        View::render('admin.statuses', [
+            'statuses' => $statuses
+        ]);
+    }
+
+    public function updateStatusColor()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            View::json(['error' => 'Méthode non autorisée'], 405);
+        }
+
+        $statusId = $_POST['status_id'] ?? null;
+        $color = $_POST['color'] ?? null;
+
+        if (!$statusId || !$color) {
+            View::json(['error' => 'Données manquantes'], 400);
+        }
+
+        try {
+            $statusModel = new Status();
+            $statusModel->updateColor($statusId, $color);
+
+            Session::flash('success', 'Couleur mise à jour avec succès');
+            View::json(['success' => true]);
+        } catch (\Exception $e) {
+            View::json(['error' => $e->getMessage()], 400);
+        }
     }
 }

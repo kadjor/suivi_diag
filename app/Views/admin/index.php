@@ -14,7 +14,13 @@
             <a href="/admin/referentials" class="action-card">
                 <div class="action-icon">📋</div>
                 <h3>Référentiels</h3>
-                <p>Statuts, types de diagnostics, etc.</p>
+                <p>Rôles et données de base</p>
+            </a>
+
+            <a href="/admin/statuses" class="action-card">
+                <div class="action-icon">🎨</div>
+                <h3>Statuts & Couleurs</h3>
+                <p>Gérer les couleurs des statuts</p>
             </a>
 
             <a href="/admin/audit-logs" class="action-card">

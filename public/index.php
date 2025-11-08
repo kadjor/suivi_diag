@@ -190,6 +190,8 @@ $router->get('/admin/settings', 'Controllers\AdminController@settings');
 $router->post('/admin/settings', 'Controllers\AdminController@updateSettings');
 $router->get('/admin/audit-logs', 'Controllers\AdminController@auditLogs');
 $router->get('/admin/referentials', 'Controllers\AdminController@referentials');
+$router->get('/admin/statuses', 'Controllers\AdminController@statuses');
+$router->post('/admin/statuses/update-color', 'Controllers\AdminController@updateStatusColor');
 
 // Routes protégées - Exports
 $router->get('/export/orders', 'Controllers\ExportController@orders');
