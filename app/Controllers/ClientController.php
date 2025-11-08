@@ -39,7 +39,7 @@ class ClientController extends Controller
             View::redirect('/dashboard');
         }
 
-        $clients = $this->clientModel->all();
+        $clients = $this->clientModel->getAll();
 
         View::render('clients.index', [
             'clients' => $clients
