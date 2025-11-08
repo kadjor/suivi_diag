@@ -38,7 +38,7 @@ class OrderController extends Controller
         $status = $_GET['status'] ?? null;
         $user = Auth::user();
 
-        if ($user['role_slug'] === 'client') {
+        if ($user['role_name'] === 'client') {
             $orders = $this->orderModel->getByClient($user['client_id'], 20, $page);
         } else {
             $orders = $status
@@ -66,7 +66,7 @@ class OrderController extends Controller
 
         // Vérifier les permissions
         $user = Auth::user();
-        if ($user['role_slug'] === 'client' && $order['client_id'] != $user['client_id']) {
+        if ($user['role_name'] === 'client' && $order['client_id'] != $user['client_id']) {
             Session::flash('error', 'Accès refusé');
             View::redirect('/orders');
         }

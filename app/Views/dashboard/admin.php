@@ -34,10 +34,10 @@
             <tbody>
                 <?php foreach ($recent_orders ?? [] as $order): ?>
                 <tr>
-                    <td><a href="/orders/<?= $order['id'] ?>"><?= htmlspecialchars($order['reference']) ?></a></td>
-                    <td><?= htmlspecialchars($order['client_name']) ?></td>
-                    <td><?= htmlspecialchars($order['status']) ?></td>
-                    <td><?= htmlspecialchars($order['created_at']) ?></td>
+                    <td><a href="/orders/<?= $order['id'] ?>"><?= htmlspecialchars($order['order_number']) ?></a></td>
+                    <td><?= htmlspecialchars($order['client_name'] ?? 'N/A') ?></td>
+                    <td><span class="badge" style="background-color: <?= $order['status_color'] ?? '#999' ?>"><?= htmlspecialchars($order['status_label'] ?? 'N/A') ?></span></td>
+                    <td><?= date('d/m/Y H:i', strtotime($order['created_at'])) ?></td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>

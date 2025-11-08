@@ -25,7 +25,7 @@ class ReportController extends Controller
     public function index()
     {
         $user = Auth::user();
-        $reports = $user['role_slug'] === 'client'
+        $reports = $user['role_name'] === 'client'
             ? $this->reportModel->getByClient($user['client_id'])
             : $this->reportModel->getAll();
 
@@ -80,7 +80,7 @@ class ReportController extends Controller
         $orderModel = new Order();
         $order = $orderModel->find($report['order_id']);
 
-        if ($user['role_slug'] === 'client' && $order['client_id'] != $user['client_id']) {
+        if ($user['role_name'] === 'client' && $order['client_id'] != $user['client_id']) {
             Session::flash('error', 'Accès refusé');
             View::redirect('/reports');
         }

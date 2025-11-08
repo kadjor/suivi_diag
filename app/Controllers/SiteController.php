@@ -25,7 +25,7 @@ class SiteController extends Controller
     public function index()
     {
         $user = Auth::user();
-        $sites = $user['role_slug'] === 'client'
+        $sites = $user['role_name'] === 'client'
             ? $this->siteModel->getByClient($user['client_id'])
             : $this->siteModel->getAll();
 

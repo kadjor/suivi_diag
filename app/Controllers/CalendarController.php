@@ -31,7 +31,7 @@ class CalendarController extends Controller
         $appointmentModel = new Appointment();
         $interventionModel = new Intervention();
 
-        if ($user['role_slug'] === 'technician') {
+        if ($user['role_name'] === 'technicien') {
             $events = $appointmentModel->getByTechnician($user['id'], $start, $end);
         } else {
             $events = $appointmentModel->getAll($start, $end);

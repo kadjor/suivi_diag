@@ -32,7 +32,7 @@ class MapController extends Controller
             'diagnostic_type' => $_GET['diagnostic_type'] ?? null
         ];
 
-        if ($user['role_slug'] === 'client') {
+        if ($user['role_name'] === 'client') {
             $filters['client_id'] = $user['client_id'];
         }
 

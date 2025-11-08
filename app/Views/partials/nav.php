@@ -1,13 +1,13 @@
 <?php
 use Core\Auth;
 $user = Auth::user();
-$role = $user['role_slug'] ?? '';
+$role = $user['role_name'] ?? '';
 ?>
 <nav class="main-nav">
     <ul>
         <li><a href="/dashboard" class="nav-link">Tableau de bord</a></li>
 
-        <?php if ($role === 'admin' || $role === 'secretary'): ?>
+        <?php if ($role === 'admin' || $role === 'secretariat'): ?>
             <li><a href="/orders" class="nav-link">Commandes</a></li>
             <li><a href="/sites" class="nav-link">Sites</a></li>
             <li><a href="/clients" class="nav-link">Clients</a></li>
