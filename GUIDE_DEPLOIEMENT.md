@@ -1,44 +1,97 @@
 # Guide de Déploiement
 
+## ⚠️ PROBLÈME IDENTIFIÉ : Dépôt GitHub introuvable
+
+**Le dépôt https://github.com/kadjor/suivi_diag n'existe pas ou est privé.**
+
+### Solutions possibles :
+
+#### Option 1 : Créer le dépôt sur GitHub (RECOMMANDÉ)
+
+1. **Créez un nouveau dépôt sur GitHub** :
+   - Allez sur https://github.com/new
+   - Nom du dépôt : `suivi_diag`
+   - Description : "Plateforme de suivi de diagnostics"
+   - **Cochez "Public"** (très important !)
+   - Ne cochez PAS "Add a README file"
+   - Cliquez sur "Create repository"
+
+2. **Poussez votre code local** :
+   ```bash
+   cd /home/user/suivi_diag
+   git init
+   git add .
+   git commit -m "Initial commit"
+   git branch -M main
+   git remote add origin https://github.com/kadjor/suivi_diag.git
+   git push -u origin main
+   ```
+
+3. **Utilisez ensuite le téléchargement GitHub** :
+   ```
+   Utilisateur GitHub : kadjor
+   Dépôt : suivi_diag
+   Branche : main
+   ```
+
+#### Option 2 : Utiliser un autre dépôt existant
+
+Si vous avez déjà un autre dépôt GitHub pour ce projet :
+
+1. **Trouvez le bon nom** :
+   - Allez sur https://github.com/kadjor
+   - Vérifiez le nom EXACT du dépôt
+   - Notez la branche principale (main ou master)
+
+2. **Utilisez ces informations dans le formulaire**
+
+#### Option 3 : Ne PAS utiliser GitHub (mode local uniquement)
+
+Si vous ne voulez pas utiliser GitHub :
+
+1. **Désactivez le formulaire GitHub** dans `/deploy`
+2. **Utilisez uniquement les migrations locales** (voir section ci-dessous)
+3. Les mises à jour devront être faites manuellement
+
 ## 1. Téléchargement depuis GitHub
 
-### ⚠️ Important : NE PAS utiliser de lien complet
+### ⚠️ Important : Format correct
 
-Dans le formulaire de téléchargement GitHub (`/deploy`), utilisez **uniquement** les informations suivantes :
+Dans le formulaire de téléchargement GitHub (`/deploy`), utilisez **chaque champ séparément** :
 
+**✅ Format CORRECT :**
 ```
 Utilisateur GitHub : kadjor
 Dépôt : suivi_diag
 Branche : main
 ```
 
-**❌ Ne faites PAS :**
+**❌ Format INCORRECT :**
 - Mettre le lien complet : `https://github.com/kadjor/suivi_diag`
 - Ajouter `.git` à la fin
 - Utiliser des slashes (`/`)
 
-**✅ Faites :**
-- Séparer chaque information dans son champ
-- Vérifier que le dépôt est **public** (sinon erreur 404)
-- Utiliser le nom exact de la branche
+### Erreur 404 - Solutions détaillées
 
-### Erreur 404 - Solutions
+Si vous obtenez l'erreur "Échec du téléchargement (HTTP 404)" :
 
-Si vous obtenez une erreur 404 :
+1. **Le dépôt n'existe PAS**
+   - Vérifiez en allant sur https://github.com/kadjor/suivi_diag
+   - Si vous voyez "404", le dépôt n'existe pas
+   - **Solution** : Créez le dépôt (voir Option 1 ci-dessus)
 
-1. **Vérifiez que le dépôt est public**
-   - Allez sur https://github.com/kadjor/suivi_diag
-   - Si vous ne pouvez pas y accéder sans vous connecter, le dépôt est privé
-   - Rendez-le public dans Settings > General > Danger Zone
+2. **Le dépôt est PRIVÉ**
+   - Si le dépôt demande une connexion, il est privé
+   - **Solution** : Rendez-le public dans Settings > General > Danger Zone > Change visibility > Make public
 
-2. **Vérifiez le nom de la branche**
-   - Le nom doit être exact : `main` ou `master`
-   - Pas de majuscules si c'est en minuscules
-   - Pas d'espaces
+3. **Le nom est incorrect**
+   - Vérifiez l'orthographe exacte
+   - Utilisateur : `kadjor` (sans majuscules, sans espaces)
+   - Dépôt : le nom EXACT visible sur GitHub
 
-3. **Vérifiez l'orthographe**
-   - Utilisateur : exactement `kadjor`
-   - Dépôt : exactement `suivi_diag`
+4. **La branche n'existe pas**
+   - Vérifiez si c'est `main` ou `master`
+   - Regardez dans l'interface GitHub, en haut à gauche
 
 ## 2. Migrations SQL
 

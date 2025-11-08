@@ -676,15 +676,19 @@ class DeployController extends Controller
     public function migrations()
     {
         try {
-            // Nettoyer tout buffer de sortie existant
-            if (ob_get_level()) {
-                ob_clean();
+            // Nettoyer TOUS les buffers de sortie
+            while (ob_get_level()) {
+                ob_end_clean();
             }
+
+            // Démarrer un nouveau buffer
+            ob_start();
 
             $migrationsDir = $this->appDir . '/database/migrations';
             $migrations = [];
 
             if (!is_dir($migrationsDir)) {
+                ob_end_clean();
                 View::json(['migrations' => []]);
                 return;
             }
@@ -692,6 +696,7 @@ class DeployController extends Controller
             $files = glob($migrationsDir . '/*.sql');
 
             if ($files === false) {
+                ob_end_clean();
                 View::json(['migrations' => []]);
                 return;
             }
@@ -708,12 +713,13 @@ class DeployController extends Controller
                 ];
             }
 
+            ob_end_clean();
             View::json(['migrations' => $migrations]);
 
         } catch (\Exception $e) {
-            // Nettoyer tout buffer de sortie
-            if (ob_get_level()) {
-                ob_clean();
+            // Nettoyer TOUS les buffers
+            while (ob_get_level()) {
+                ob_end_clean();
             }
 
             $this->log('✗ Erreur liste migrations: ' . $e->getMessage());
@@ -783,10 +789,13 @@ class DeployController extends Controller
     public function runMigrations()
     {
         try {
-            // Nettoyer tout buffer de sortie existant
-            if (ob_get_level()) {
-                ob_clean();
+            // Nettoyer TOUS les buffers de sortie
+            while (ob_get_level()) {
+                ob_end_clean();
             }
+
+            // Démarrer un nouveau buffer
+            ob_start();
 
             $this->log('===== EXÉCUTION DES MIGRATIONS =====');
             $this->log('Utilisateur: ' . Auth::user()['email']);
@@ -814,6 +823,7 @@ class DeployController extends Controller
             if ($files === false || empty($files)) {
                 $results['errors'][] = 'Aucune migration trouvée';
                 $this->log('✗ Aucune migration trouvée');
+                ob_end_clean();
                 View::json($results);
                 return;
             }
@@ -883,12 +893,13 @@ class DeployController extends Controller
                 $this->log('===== MIGRATIONS TERMINÉES AVEC ERREURS =====');
             }
 
+            ob_end_clean();
             View::json($results);
 
         } catch (\Exception $e) {
-            // Nettoyer tout buffer de sortie
-            if (ob_get_level()) {
-                ob_clean();
+            // Nettoyer TOUS les buffers
+            while (ob_get_level()) {
+                ob_end_clean();
             }
 
             $this->log('✗ ERREUR CRITIQUE: ' . $e->getMessage());
