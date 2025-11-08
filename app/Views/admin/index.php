@@ -34,6 +34,12 @@
                 <h3>Paramètres</h3>
                 <p>Configuration de l'application</p>
             </a>
+
+            <a href="/deploy" class="action-card highlight">
+                <div class="action-icon">🚀</div>
+                <h3>Déploiement</h3>
+                <p>Mise à jour depuis GitHub</p>
+            </a>
         </div>
     </div>
 
@@ -171,6 +177,22 @@
     border-color: #3498db;
     transform: translateY(-2px);
     box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.action-card.highlight {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-color: #667eea;
+}
+
+.action-card.highlight h3,
+.action-card.highlight p {
+    color: white;
+}
+
+.action-card.highlight:hover {
+    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+    border-color: #764ba2;
 }
 
 .action-icon {

@@ -200,6 +200,13 @@ $router->get('/admin/referentials', 'Controllers\AdminController@referentials');
 $router->get('/admin/statuses', 'Controllers\AdminController@statuses');
 $router->post('/admin/statuses/update-color', 'Controllers\AdminController@updateStatusColor');
 
+// Routes protégées - Déploiement (admin seulement)
+$router->get('/deploy', 'Controllers\DeployController@index');
+$router->post('/deploy/pull', 'Controllers\DeployController@pull');
+$router->get('/deploy/diff', 'Controllers\DeployController@diff');
+$router->post('/deploy/reset', 'Controllers\DeployController@reset');
+$router->get('/deploy/backups', 'Controllers\DeployController@backups');
+
 // Routes protégées - Exports
 $router->get('/export/orders', 'Controllers\ExportController@orders');
 $router->get('/export/interventions', 'Controllers\ExportController@interventions');

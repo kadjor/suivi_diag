@@ -29,6 +29,7 @@ $role = $user['role_name'] ?? '';
 
         <?php if ($role === 'admin'): ?>
             <li><a href="/admin" class="nav-link">Administration</a></li>
+            <li><a href="/deploy" class="nav-link">🚀 Déploiement</a></li>
         <?php endif; ?>
 
         <li><a href="/profile" class="nav-link">Mon Profil</a></li>

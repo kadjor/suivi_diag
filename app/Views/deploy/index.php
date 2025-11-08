@@ -1,0 +1,623 @@
+<h1>🚀 Déploiement et Mise à jour</h1>
+
+<div class="deploy-container">
+    <!-- Statut Git -->
+    <div class="card">
+        <h2>📊 Statut Git</h2>
+
+        <div class="info-grid">
+            <div class="info-item">
+                <strong>Branche actuelle:</strong>
+                <span class="badge badge-info"><?= htmlspecialchars($currentBranch) ?></span>
+            </div>
+
+            <div class="info-item">
+                <strong>Répertoire:</strong>
+                <span><?= htmlspecialchars($appDir) ?></span>
+            </div>
+
+            <div class="info-item">
+                <strong>État:</strong>
+                <?php if ($hasChanges): ?>
+                    <span class="badge badge-warning">⚠️ Changements locaux</span>
+                <?php else: ?>
+                    <span class="badge badge-success">✅ Propre</span>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <?php if (!empty($gitStatus['files'])): ?>
+        <div class="git-changes">
+            <h3>Fichiers modifiés:</h3>
+            <pre class="code-block"><?php
+                foreach ($gitStatus['files'] as $file) {
+                    echo htmlspecialchars($file) . "\n";
+                }
+            ?></pre>
+        </div>
+        <?php endif; ?>
+    </div>
+
+    <!-- Actions de déploiement -->
+    <div class="card">
+        <h2>⚙️ Actions</h2>
+
+        <div class="action-buttons">
+            <button id="btnDiff" class="btn btn-info">
+                📋 Voir les différences
+            </button>
+
+            <button id="btnPull" class="btn btn-primary">
+                ⬇️ Mettre à jour (Git Pull)
+            </button>
+
+            <?php if ($hasChanges): ?>
+            <button id="btnReset" class="btn btn-warning">
+                🔄 Réinitialiser les changements
+            </button>
+            <?php endif; ?>
+
+            <button id="btnBackups" class="btn btn-secondary">
+                💾 Voir les backups
+            </button>
+        </div>
+
+        <div id="actionResult" class="action-result"></div>
+    </div>
+
+    <!-- Derniers commits -->
+    <div class="card">
+        <h2>📝 Derniers commits</h2>
+
+        <?php if (!empty($lastCommits)): ?>
+        <div class="commits-list">
+            <?php foreach ($lastCommits as $commit): ?>
+            <div class="commit-item">
+                <span class="commit-hash"><?= htmlspecialchars($commit['hash']) ?></span>
+                <span class="commit-message"><?= htmlspecialchars($commit['message']) ?></span>
+                <span class="commit-meta">
+                    par <strong><?= htmlspecialchars($commit['author']) ?></strong>
+                    • <?= htmlspecialchars($commit['date']) ?>
+                </span>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        <?php else: ?>
+        <p class="no-data">Aucun commit trouvé</p>
+        <?php endif; ?>
+    </div>
+
+    <!-- Logs de déploiement -->
+    <div class="card">
+        <h2>📜 Logs de déploiement</h2>
+
+        <?php if (!empty($deployLogs)): ?>
+        <pre class="log-viewer"><?php
+            foreach ($deployLogs as $log) {
+                echo htmlspecialchars($log) . "\n";
+            }
+        ?></pre>
+        <button id="btnRefreshLogs" class="btn btn-small">🔄 Actualiser les logs</button>
+        <?php else: ?>
+        <p class="no-data">Aucun log de déploiement</p>
+        <?php endif; ?>
+    </div>
+</div>
+
+<!-- Modal pour afficher les résultats -->
+<div id="resultModal" class="modal">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2 id="modalTitle">Résultat</h2>
+        <div id="modalBody"></div>
+    </div>
+</div>
+
+<script>
+// Modal
+const modal = document.getElementById('resultModal');
+const modalTitle = document.getElementById('modalTitle');
+const modalBody = document.getElementById('modalBody');
+const closeBtn = document.querySelector('.close');
+
+closeBtn.onclick = function() {
+    modal.style.display = 'none';
+}
+
+window.onclick = function(event) {
+    if (event.target === modal) {
+        modal.style.display = 'none';
+    }
+}
+
+function showModal(title, content, isHtml = false) {
+    modalTitle.textContent = title;
+    if (isHtml) {
+        modalBody.innerHTML = content;
+    } else {
+        modalBody.textContent = content;
+    }
+    modal.style.display = 'block';
+}
+
+// Voir les différences
+document.getElementById('btnDiff').addEventListener('click', async function() {
+    this.disabled = true;
+    this.textContent = '⏳ Chargement...';
+
+    try {
+        const response = await fetch('/deploy/diff');
+        const data = await response.json();
+
+        if (data.diff) {
+            showModal('📋 Différences avec la version distante', data.diff);
+        } else {
+            showModal('📋 Différences', 'Aucune différence trouvée');
+        }
+    } catch (error) {
+        showModal('❌ Erreur', error.message);
+    } finally {
+        this.disabled = false;
+        this.textContent = '📋 Voir les différences';
+    }
+});
+
+// Git Pull
+document.getElementById('btnPull').addEventListener('click', async function() {
+    if (!confirm('⚠️ Voulez-vous vraiment mettre à jour l\'application ?\n\nUn backup sera automatiquement créé avant la mise à jour.')) {
+        return;
+    }
+
+    this.disabled = true;
+    this.textContent = '⏳ Mise à jour en cours...';
+    const resultDiv = document.getElementById('actionResult');
+    resultDiv.innerHTML = '<div class="loading">⏳ Mise à jour en cours, veuillez patienter...</div>';
+
+    try {
+        const response = await fetch('/deploy/pull', { method: 'POST' });
+        const data = await response.json();
+
+        let resultHtml = '';
+
+        if (data.success) {
+            resultHtml = '<div class="result-success"><h3>✅ Mise à jour réussie !</h3>';
+
+            if (data.messages && data.messages.length > 0) {
+                resultHtml += '<ul>';
+                data.messages.forEach(msg => {
+                    resultHtml += '<li>' + escapeHtml(msg) + '</li>';
+                });
+                resultHtml += '</ul>';
+            }
+
+            resultHtml += '<p><strong>Veuillez recharger la page pour voir les changements.</strong></p>';
+            resultHtml += '</div>';
+
+            // Recharger après 3 secondes
+            setTimeout(() => {
+                window.location.reload();
+            }, 3000);
+        } else {
+            resultHtml = '<div class="result-error"><h3>❌ Erreur lors de la mise à jour</h3>';
+
+            if (data.errors && data.errors.length > 0) {
+                resultHtml += '<ul>';
+                data.errors.forEach(err => {
+                    resultHtml += '<li>' + escapeHtml(err) + '</li>';
+                });
+                resultHtml += '</ul>';
+            }
+
+            resultHtml += '</div>';
+        }
+
+        resultDiv.innerHTML = resultHtml;
+
+    } catch (error) {
+        resultDiv.innerHTML = '<div class="result-error">❌ Erreur: ' + escapeHtml(error.message) + '</div>';
+    } finally {
+        this.disabled = false;
+        this.textContent = '⬇️ Mettre à jour (Git Pull)';
+    }
+});
+
+// Reset
+const btnReset = document.getElementById('btnReset');
+if (btnReset) {
+    btnReset.addEventListener('click', async function() {
+        if (!confirm('⚠️ ATTENTION: Cette action va supprimer TOUS vos changements locaux !\n\nÊtes-vous sûr de vouloir continuer ?')) {
+            return;
+        }
+
+        this.disabled = true;
+        this.textContent = '⏳ Réinitialisation...';
+
+        try {
+            const response = await fetch('/deploy/reset', { method: 'POST' });
+            const data = await response.json();
+
+            if (data.success) {
+                alert('✅ ' + data.message);
+                window.location.reload();
+            } else {
+                alert('❌ ' + data.error);
+            }
+        } catch (error) {
+            alert('❌ Erreur: ' + error.message);
+        } finally {
+            this.disabled = false;
+            this.textContent = '🔄 Réinitialiser les changements';
+        }
+    });
+}
+
+// Voir les backups
+document.getElementById('btnBackups').addEventListener('click', async function() {
+    this.disabled = true;
+    this.textContent = '⏳ Chargement...';
+
+    try {
+        const response = await fetch('/deploy/backups');
+        const data = await response.json();
+
+        let content = '<div class="backups-list">';
+
+        if (data.backups && data.backups.length > 0) {
+            content += '<table class="data-table">';
+            content += '<thead><tr><th>Fichier</th><th>Taille</th><th>Date</th></tr></thead>';
+            content += '<tbody>';
+            data.backups.forEach(backup => {
+                content += '<tr>';
+                content += '<td>' + escapeHtml(backup.name) + '</td>';
+                content += '<td>' + escapeHtml(backup.size) + '</td>';
+                content += '<td>' + escapeHtml(backup.date) + '</td>';
+                content += '</tr>';
+            });
+            content += '</tbody></table>';
+        } else {
+            content += '<p>Aucun backup trouvé</p>';
+        }
+
+        content += '</div>';
+
+        showModal('💾 Backups disponibles', content, true);
+    } catch (error) {
+        showModal('❌ Erreur', error.message);
+    } finally {
+        this.disabled = false;
+        this.textContent = '💾 Voir les backups';
+    }
+});
+
+// Actualiser les logs
+document.getElementById('btnRefreshLogs')?.addEventListener('click', function() {
+    window.location.reload();
+});
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+</script>
+
+<style>
+.deploy-container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.card {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 25px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.card h2 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #3498db;
+    color: #2c3e50;
+}
+
+.card h3 {
+    margin-top: 15px;
+    margin-bottom: 10px;
+    color: #34495e;
+    font-size: 1.1em;
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.info-item {
+    padding: 12px;
+    background: #f8f9fa;
+    border-radius: 4px;
+    border-left: 3px solid #3498db;
+}
+
+.info-item strong {
+    display: block;
+    margin-bottom: 5px;
+    color: #666;
+    font-size: 0.9em;
+}
+
+.info-item span {
+    display: block;
+    font-size: 1.05em;
+    color: #2c3e50;
+}
+
+.badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.9em;
+    font-weight: 500;
+}
+
+.badge-success {
+    background: #d4edda;
+    color: #155724;
+}
+
+.badge-warning {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.badge-info {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+
+.git-changes {
+    margin-top: 15px;
+}
+
+.code-block {
+    background: #2c3e50;
+    color: #ecf0f1;
+    padding: 15px;
+    border-radius: 4px;
+    overflow-x: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.action-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.btn-primary {
+    background: #3498db;
+    color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: #2980b9;
+}
+
+.btn-info {
+    background: #17a2b8;
+    color: white;
+}
+
+.btn-info:hover:not(:disabled) {
+    background: #138496;
+}
+
+.btn-warning {
+    background: #f39c12;
+    color: white;
+}
+
+.btn-warning:hover:not(:disabled) {
+    background: #e67e22;
+}
+
+.btn-secondary {
+    background: #95a5a6;
+    color: white;
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background: #7f8c8d;
+}
+
+.btn-small {
+    padding: 8px 16px;
+    font-size: 13px;
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.action-result {
+    margin-top: 20px;
+}
+
+.loading {
+    padding: 20px;
+    background: #d1ecf1;
+    border: 1px solid #bee5eb;
+    border-radius: 4px;
+    color: #0c5460;
+    text-align: center;
+}
+
+.result-success {
+    padding: 20px;
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    border-radius: 4px;
+    color: #155724;
+}
+
+.result-success h3 {
+    margin-top: 0;
+    color: #155724;
+}
+
+.result-error {
+    padding: 20px;
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    border-radius: 4px;
+    color: #721c24;
+}
+
+.result-error h3 {
+    margin-top: 0;
+    color: #721c24;
+}
+
+.result-success ul,
+.result-error ul {
+    margin: 10px 0;
+    padding-left: 20px;
+}
+
+.commits-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.commit-item {
+    padding: 12px;
+    background: #f8f9fa;
+    border-left: 3px solid #3498db;
+    border-radius: 4px;
+    display: grid;
+    gap: 5px;
+}
+
+.commit-hash {
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    color: #e74c3c;
+    font-size: 0.9em;
+}
+
+.commit-message {
+    color: #2c3e50;
+    font-weight: 500;
+}
+
+.commit-meta {
+    color: #7f8c8d;
+    font-size: 0.85em;
+}
+
+.log-viewer {
+    background: #2c3e50;
+    color: #ecf0f1;
+    padding: 15px;
+    border-radius: 4px;
+    overflow-x: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85em;
+    max-height: 400px;
+    overflow-y: auto;
+    line-height: 1.5;
+}
+
+.no-data {
+    text-align: center;
+    padding: 30px;
+    color: #999;
+}
+
+/* Modal */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 5% auto;
+    padding: 30px;
+    border: 1px solid #888;
+    border-radius: 8px;
+    width: 80%;
+    max-width: 800px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 20px;
+}
+
+.close:hover,
+.close:focus {
+    color: #000;
+}
+
+.backups-list table {
+    width: 100%;
+    margin-top: 15px;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.data-table th,
+.data-table td {
+    padding: 10px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.data-table th {
+    background: #f8f9fa;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.data-table tbody tr:hover {
+    background: #f8f9fa;
+}
+</style>
