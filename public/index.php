@@ -184,6 +184,11 @@ $router->get('/profile', 'Controllers\UserController@profile');
 $router->post('/profile/update', 'Controllers\UserController@updateProfile');
 $router->post('/profile/change-password', 'Controllers\UserController@changePassword');
 
+// Routes protégées - Cartographie
+$router->get('/map', 'Controllers\MapController@index');
+$router->get('/map/nearby-orders', 'Controllers\MapController@getNearbyOrders');
+$router->get('/map/search-address', 'Controllers\MapController@searchAddress');
+
 // Routes protégées - Administration
 $router->get('/admin', 'Controllers\AdminController@index');
 $router->get('/admin/users', 'Controllers\AdminController@users');
