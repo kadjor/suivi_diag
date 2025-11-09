@@ -769,35 +769,34 @@ class DeployController extends Controller
      */
     public function migrations()
     {
-        // Désactiver l'affichage des erreurs pour éviter pollution JSON
+        // ULTRA ROBUSTE - Désactiver TOUTE sortie PHP
         @ini_set('display_errors', '0');
+        @ini_set('display_startup_errors', '0');
         @ini_set('log_errors', '1');
-        error_reporting(E_ALL);
+        @ini_set('html_errors', '0');
+        @error_reporting(0);
 
-        // Nettoyer ABSOLUMENT TOUT
-        while (@ob_end_clean());
+        // Nettoyer ABSOLUMENT TOUT avant de commencer
+        while (@ob_get_level() > 0) {
+            @ob_end_clean();
+        }
 
-        // Démarrer un nouveau buffer propre
-        ob_start();
+        // NE PAS utiliser ob_start - envoyer directement
 
         try {
             $migrationsDir = $this->appDir . '/database/migrations';
             $migrations = [];
 
             if (!is_dir($migrationsDir)) {
-                ob_end_clean();
-                header('Content-Type: application/json; charset=utf-8');
-                echo json_encode(['migrations' => [], 'debug' => 'dir not found']);
-                exit;
+                header('Content-Type: application/json; charset=utf-8', true);
+                die(json_encode(['migrations' => [], 'debug' => 'dir not found']));
             }
 
             $files = @glob($migrationsDir . '/*.sql');
 
             if ($files === false || $files === null) {
-                ob_end_clean();
-                header('Content-Type: application/json; charset=utf-8');
-                echo json_encode(['migrations' => [], 'debug' => 'glob failed']);
-                exit;
+                header('Content-Type: application/json; charset=utf-8', true);
+                die(json_encode(['migrations' => [], 'debug' => 'glob failed']));
             }
 
             sort($files);
@@ -810,7 +809,7 @@ class DeployController extends Controller
                 try {
                     $executed = $this->isMigrationExecutedSafe($name);
                 } catch (\Exception $e) {
-                    // Ignorer silencieusement les erreurs de vérification
+                    // Ignorer silencieusement
                 }
 
                 $migrations[] = [
@@ -821,27 +820,24 @@ class DeployController extends Controller
                 ];
             }
 
-            // Nettoyer le buffer
-            ob_end_clean();
-
-            // Envoyer le JSON
-            header('Content-Type: application/json; charset=utf-8');
-            echo json_encode(['migrations' => $migrations, 'success' => true]);
-            exit;
+            // Envoyer le JSON directement
+            header('Content-Type: application/json; charset=utf-8', true);
+            die(json_encode(['migrations' => $migrations, 'success' => true]));
 
         } catch (\Exception $e) {
-            // Nettoyer TOUT
-            while (@ob_end_clean());
+            // Nettoyer TOUT en cas d'erreur
+            while (@ob_get_level() > 0) {
+                @ob_end_clean();
+            }
 
             $this->log('✗ Erreur liste migrations: ' . $e->getMessage());
 
-            header('Content-Type: application/json; charset=utf-8');
-            echo json_encode([
+            header('Content-Type: application/json; charset=utf-8', true);
+            die(json_encode([
                 'error' => $e->getMessage(),
                 'migrations' => [],
                 'success' => false
-            ]);
-            exit;
+            ]));
         }
     }
 
