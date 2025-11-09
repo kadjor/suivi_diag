@@ -5,17 +5,125 @@
  * Ce fichier initialise l'application et route les requêtes
  */
 
+// ==================================================================================
+// INTERCEPTION PRÉCOCE pour /deploy/migrations (éviter pollution de sortie)
+// DOIT être AVANT session_start() et toute autre initialisation
+// ==================================================================================
+$requestUri = $_SERVER['REQUEST_URI'];
+if (($pos = strpos($requestUri, '?')) !== false) {
+    $requestUri = substr($requestUri, 0, $pos);
+}
+
+// Si c'est une requête vers /deploy/migrations, traiter immédiatement
+if ($requestUri === '/deploy/migrations' || strpos($requestUri, '/deploy/migrations') !== false) {
+    // Désactiver TOUTE sortie PHP
+    @ini_set('display_errors', '0');
+    @ini_set('display_startup_errors', '0');
+    @ini_set('log_errors', '1');
+    @ini_set('html_errors', '0');
+    @error_reporting(0);
+
+    // Nettoyer tous les buffers
+    while (@ob_get_level() > 0) {
+        @ob_end_clean();
+    }
+
+    // Définir les chemins minimaux nécessaires
+    if (!defined('ROOT_PATH')) define('ROOT_PATH', dirname(__DIR__));
+    if (!defined('APP_PATH')) define('APP_PATH', ROOT_PATH . '/app');
+    if (!defined('CONFIG_PATH')) define('CONFIG_PATH', ROOT_PATH . '/config');
+
+    // Autoloader minimal
+    spl_autoload_register(function ($class) {
+        $file = APP_PATH . '/' . str_replace('\\', '/', $class) . '.php';
+        if (file_exists($file)) {
+            @require_once $file;
+        }
+    });
+
+    // Initialiser la base de données
+    try {
+        $dbConfig = require CONFIG_PATH . '/database.php';
+        Core\Database::init($dbConfig);
+        $db = Core\Database::getInstance()->getConnection();
+    } catch (Exception $e) {
+        header('Content-Type: application/json; charset=utf-8', true);
+        die(json_encode(['error' => 'DB connection failed', 'migrations' => [], 'success' => false]));
+    }
+
+    // Traiter les migrations
+    try {
+        $migrationsDir = ROOT_PATH . '/database/migrations';
+        $migrations = [];
+
+        if (!is_dir($migrationsDir)) {
+            header('Content-Type: application/json; charset=utf-8', true);
+            die(json_encode(['migrations' => [], 'success' => true]));
+        }
+
+        $files = @glob($migrationsDir . '/*.sql');
+        if ($files === false || $files === null) {
+            $files = [];
+        }
+
+        sort($files);
+
+        foreach ($files as $file) {
+            $name = basename($file);
+            $executed = false;
+
+            // Vérifier si exécutée
+            try {
+                $result = @$db->query("SHOW TABLES LIKE 'migrations'");
+                if ($result && $result->num_rows > 0) {
+                    $stmt = @$db->prepare("SELECT id FROM migrations WHERE migration = ? LIMIT 1");
+                    if ($stmt) {
+                        $stmt->bind_param('s', $name);
+                        $stmt->execute();
+                        $result = $stmt->get_result();
+                        $executed = ($result->num_rows > 0);
+                        $stmt->close();
+                    }
+                }
+            } catch (Exception $e) {
+                // Ignorer
+            }
+
+            $migrations[] = [
+                'name' => $name,
+                'path' => $file,
+                'size' => @filesize($file) ? number_format(@filesize($file) / 1024, 2) . ' KB' : '0 KB',
+                'executed' => $executed
+            ];
+        }
+
+        header('Content-Type: application/json; charset=utf-8', true);
+        die(json_encode(['migrations' => $migrations, 'success' => true]));
+
+    } catch (Exception $e) {
+        while (@ob_get_level() > 0) {
+            @ob_end_clean();
+        }
+        header('Content-Type: application/json; charset=utf-8', true);
+        die(json_encode(['error' => $e->getMessage(), 'migrations' => [], 'success' => false]));
+    }
+}
+
+// ==================================================================================
+// APPLICATION NORMALE - Bootstrap standard
+// ==================================================================================
+
 // Démarrage session
 session_start();
 
-// Définir les chemins
-define('ROOT_PATH', dirname(__DIR__));
-define('APP_PATH', ROOT_PATH . '/app');
-define('CONFIG_PATH', ROOT_PATH . '/config');
-define('PUBLIC_PATH', ROOT_PATH . '/public');
-define('UPLOAD_PATH', PUBLIC_PATH . '/uploads');
-define('LOG_PATH', ROOT_PATH . '/logs');
-define('LIB_PATH', ROOT_PATH . '/libs');
+// Définir les chemins (vérifier s'ils n'existent pas déjà - cas de l'interception précoce)
+if (!defined('ROOT_PATH')) define('ROOT_PATH', dirname(__DIR__));
+if (!defined('APP_PATH')) define('APP_PATH', ROOT_PATH . '/app');
+if (!defined('CONFIG_PATH')) define('CONFIG_PATH', ROOT_PATH . '/config');
+if (!defined('PUBLIC_PATH')) define('PUBLIC_PATH', ROOT_PATH . '/public');
+if (!defined('UPLOAD_PATH')) define('UPLOAD_PATH', PUBLIC_PATH . '/uploads');
+if (!defined('LOG_PATH')) define('LOG_PATH', ROOT_PATH . '/logs');
+if (!defined('LIB_PATH')) define('LIB_PATH', ROOT_PATH . '/libs');
 
 // Chargement de la configuration
 $config = require CONFIG_PATH . '/app.php';
