@@ -1,57 +1,42 @@
 # Guide de Déploiement
 
-## ⚠️ PROBLÈME IDENTIFIÉ : Dépôt GitHub introuvable
+## ✅ Dépôt GitHub confirmé PUBLIC
 
-**Le dépôt https://github.com/kadjor/suivi_diag n'existe pas ou est privé.**
+**Le dépôt https://github.com/kadjor/suivi_diag existe et est accessible !**
 
-### Solutions possibles :
+### Configuration du téléchargement GitHub
 
-#### Option 1 : Créer le dépôt sur GitHub (RECOMMANDÉ)
+Pour télécharger depuis GitHub, utilisez **l'une de ces deux options** :
 
-1. **Créez un nouveau dépôt sur GitHub** :
-   - Allez sur https://github.com/new
-   - Nom du dépôt : `suivi_diag`
-   - Description : "Plateforme de suivi de diagnostics"
-   - **Cochez "Public"** (très important !)
-   - Ne cochez PAS "Add a README file"
-   - Cliquez sur "Create repository"
+#### Option 1 : Utiliser la branche actuelle (FONCTIONNEL IMMÉDIATEMENT)
 
-2. **Poussez votre code local** :
+Dans le formulaire de téléchargement GitHub sur `/deploy`, utilisez :
+
+```
+Utilisateur GitHub : kadjor
+Dépôt : suivi_diag
+Branche : claude/order-tracking-diagnostic-platform-011CUu5gBr5EcamkxJVfZ6AW
+```
+
+⚠️ **Attention** : Cette branche a un nom très long. Copiez-la exactement !
+
+#### Option 2 : Créer une branche `main` (RECOMMANDÉ pour la production)
+
+Pour avoir un nom de branche plus simple :
+
+1. **Créez une branche `main` depuis votre environnement local** :
    ```bash
    cd /home/user/suivi_diag
-   git init
-   git add .
-   git commit -m "Initial commit"
-   git branch -M main
-   git remote add origin https://github.com/kadjor/suivi_diag.git
+   git checkout -b main
    git push -u origin main
    ```
 
-3. **Utilisez ensuite le téléchargement GitHub** :
+2. **Utilisez ensuite dans le formulaire** :
    ```
    Utilisateur GitHub : kadjor
    Dépôt : suivi_diag
    Branche : main
    ```
-
-#### Option 2 : Utiliser un autre dépôt existant
-
-Si vous avez déjà un autre dépôt GitHub pour ce projet :
-
-1. **Trouvez le bon nom** :
-   - Allez sur https://github.com/kadjor
-   - Vérifiez le nom EXACT du dépôt
-   - Notez la branche principale (main ou master)
-
-2. **Utilisez ces informations dans le formulaire**
-
-#### Option 3 : Ne PAS utiliser GitHub (mode local uniquement)
-
-Si vous ne voulez pas utiliser GitHub :
-
-1. **Désactivez le formulaire GitHub** dans `/deploy`
-2. **Utilisez uniquement les migrations locales** (voir section ci-dessous)
-3. Les mises à jour devront être faites manuellement
 
 ## 1. Téléchargement depuis GitHub
 
