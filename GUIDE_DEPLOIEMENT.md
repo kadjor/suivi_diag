@@ -92,12 +92,15 @@ Si vous obtenez l'erreur "Échec du téléchargement (HTTP 404)" :
 
 Si vous obtenez l'erreur `JSON.parse: unexpected character at line 1 column 1`:
 
-**Solutions appliquées :**
-- ✅ Nettoyage du buffer de sortie PHP
-- ✅ Meilleure gestion des erreurs
-- ✅ Try-catch robuste
+**✅ Solution appliquée (DÉFINITIVE) :**
+- Interception précoce de `/deploy/migrations` dans `public/index.php`
+- La requête est traitée AVANT `session_start()` et tout le bootstrap
+- Aucune pollution de sortie possible
+- JSON pur garanti
 
-**Si l'erreur persiste :**
+Cette erreur devrait maintenant être **complètement résolue**.
+
+**Si l'erreur persiste malgré tout :**
 
 1. **Vérifiez les logs**
    ```bash
