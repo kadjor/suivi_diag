@@ -242,14 +242,28 @@ if (btnDiff) {
 const btnPull = document.getElementById('btnPull');
 if (btnPull) {
     btnPull.addEventListener('click', async function() {
-        if (!confirm('⚠️ Voulez-vous vraiment mettre à jour l\'application ?\n\nUn backup sera automatiquement créé avant la mise à jour.')) {
-            return;
-        }
-
-        this.disabled = true;
-        this.textContent = '⏳ Mise à jour en cours...';
         const resultDiv = document.getElementById('actionResult');
-        resultDiv.innerHTML = '<div class="loading">⏳ Mise à jour en cours, veuillez patienter...</div>';
+
+        // Confirmation inline
+        resultDiv.innerHTML = `
+            <div class="confirm-box">
+                <p><strong>⚠️ Confirmer la mise à jour</strong></p>
+                <p>Un backup sera automatiquement créé avant la mise à jour.</p>
+                <div style="margin-top: 15px;">
+                    <button class="btn btn-primary" id="confirmPull">✓ Confirmer</button>
+                    <button class="btn btn-secondary" id="cancelPull">✗ Annuler</button>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('cancelPull').onclick = () => {
+            resultDiv.innerHTML = '';
+        };
+
+        document.getElementById('confirmPull').onclick = async () => {
+            this.disabled = true;
+            this.textContent = '⏳ Mise à jour en cours...';
+            resultDiv.innerHTML = '<div class="loading">⏳ Mise à jour en cours, veuillez patienter...</div>';
 
         try {
             const response = await fetch('/deploy/pull', { method: 'POST' });
@@ -297,6 +311,7 @@ if (btnPull) {
             this.disabled = false;
             this.textContent = '⬇️ Mettre à jour (Git Pull)';
         }
+        };
     });
 }
 
@@ -304,29 +319,46 @@ if (btnPull) {
 const btnReset = document.getElementById('btnReset');
 if (btnReset) {
     btnReset.addEventListener('click', async function() {
-        if (!confirm('⚠️ ATTENTION: Cette action va supprimer TOUS vos changements locaux !\n\nÊtes-vous sûr de vouloir continuer ?')) {
-            return;
-        }
+        const resultDiv = document.getElementById('actionResult');
 
-        this.disabled = true;
-        this.textContent = '⏳ Réinitialisation...';
+        // Confirmation inline
+        resultDiv.innerHTML = `
+            <div class="confirm-box warning">
+                <p><strong>⚠️ ATTENTION: Action destructive</strong></p>
+                <p>Cette action va supprimer TOUS vos changements locaux.</p>
+                <div style="margin-top: 15px;">
+                    <button class="btn btn-warning" id="confirmReset">✓ Confirmer la réinitialisation</button>
+                    <button class="btn btn-secondary" id="cancelReset">✗ Annuler</button>
+                </div>
+            </div>
+        `;
 
-        try {
-            const response = await fetch('/deploy/reset', { method: 'POST' });
-            const data = await response.json();
+        document.getElementById('cancelReset').onclick = () => {
+            resultDiv.innerHTML = '';
+        };
 
-            if (data.success) {
-                alert('✅ ' + data.message);
-                window.location.reload();
-            } else {
-                alert('❌ ' + data.error);
+        document.getElementById('confirmReset').onclick = async () => {
+            this.disabled = true;
+            this.textContent = '⏳ Réinitialisation...';
+            resultDiv.innerHTML = '<div class="loading">⏳ Réinitialisation en cours...</div>';
+
+            try {
+                const response = await fetch('/deploy/reset', { method: 'POST' });
+                const data = await response.json();
+
+                if (data.success) {
+                    resultDiv.innerHTML = '<div class="result-success">✅ ' + escapeHtml(data.message) + '<br>Rechargement dans 2 secondes...</div>';
+                    setTimeout(() => window.location.reload(), 2000);
+                } else {
+                    resultDiv.innerHTML = '<div class="result-error">❌ ' + escapeHtml(data.error) + '</div>';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = '<div class="result-error">❌ Erreur: ' + escapeHtml(error.message) + '</div>';
+            } finally {
+                this.disabled = false;
+                this.textContent = '🔄 Réinitialiser les changements';
             }
-        } catch (error) {
-            alert('❌ Erreur: ' + error.message);
-        } finally {
-            this.disabled = false;
-            this.textContent = '🔄 Réinitialiser les changements';
-        }
+        };
     });
 }
 
@@ -378,20 +410,36 @@ document.getElementById('btnDownloadGithub')?.addEventListener('click', async fu
     const githubUser = document.getElementById('github_user').value;
     const githubRepo = document.getElementById('github_repo').value;
     const githubBranch = document.getElementById('github_branch').value;
+    const resultDiv = document.getElementById('actionResult');
 
     if (!githubUser || !githubRepo || !githubBranch) {
-        alert('⚠️ Veuillez remplir tous les champs');
+        resultDiv.innerHTML = '<div class="result-error">⚠️ Veuillez remplir tous les champs</div>';
         return;
     }
 
-    if (!confirm(`⚠️ Voulez-vous vraiment télécharger depuis GitHub?\n\nUtilisateur: ${githubUser}\nDépôt: ${githubRepo}\nBranche: ${githubBranch}\n\nUn backup sera automatiquement créé.`)) {
-        return;
-    }
+    // Confirmation inline
+    resultDiv.innerHTML = `
+        <div class="confirm-box">
+            <p><strong>⚠️ Confirmer le téléchargement depuis GitHub</strong></p>
+            <p>Utilisateur: <strong>${escapeHtml(githubUser)}</strong><br>
+            Dépôt: <strong>${escapeHtml(githubRepo)}</strong><br>
+            Branche: <strong>${escapeHtml(githubBranch)}</strong></p>
+            <p>Un backup sera automatiquement créé.</p>
+            <div style="margin-top: 15px;">
+                <button class="btn btn-primary" id="confirmDownload">✓ Confirmer</button>
+                <button class="btn btn-secondary" id="cancelDownload">✗ Annuler</button>
+            </div>
+        </div>
+    `;
 
-    this.disabled = true;
-    this.textContent = '⏳ Téléchargement en cours...';
-    const resultDiv = document.getElementById('actionResult');
-    resultDiv.innerHTML = '<div class="loading">⏳ Téléchargement et déploiement en cours, veuillez patienter...</div>';
+    document.getElementById('cancelDownload').onclick = () => {
+        resultDiv.innerHTML = '';
+    };
+
+    document.getElementById('confirmDownload').onclick = async () => {
+        this.disabled = true;
+        this.textContent = '⏳ Téléchargement en cours...';
+        resultDiv.innerHTML = '<div class="loading">⏳ Téléchargement et déploiement en cours, veuillez patienter...</div>';
 
     try {
         const formData = new FormData();
@@ -447,32 +495,50 @@ document.getElementById('btnDownloadGithub')?.addEventListener('click', async fu
         this.disabled = false;
         this.textContent = '⬇️ Télécharger et déployer';
     }
+    };
 });
 
 // Restaurer les permissions
 document.getElementById('btnPermissions')?.addEventListener('click', async function() {
-    if (!confirm('🔐 Voulez-vous restaurer les permissions des fichiers et dossiers?\n\nCette action appliquera les permissions correctes pour le fonctionnement de l\'application.')) {
-        return;
-    }
+    const resultDiv = document.getElementById('actionResult');
 
-    this.disabled = true;
-    this.textContent = '⏳ Application en cours...';
+    // Confirmation inline
+    resultDiv.innerHTML = `
+        <div class="confirm-box">
+            <p><strong>🔐 Confirmer la restauration des permissions</strong></p>
+            <p>Cette action appliquera les permissions correctes pour le fonctionnement de l'application.</p>
+            <div style="margin-top: 15px;">
+                <button class="btn btn-success" id="confirmPerms">✓ Confirmer</button>
+                <button class="btn btn-secondary" id="cancelPerms">✗ Annuler</button>
+            </div>
+        </div>
+    `;
 
-    try {
-        const response = await fetch('/deploy/apply-permissions', { method: 'POST' });
-        const data = await response.json();
+    document.getElementById('cancelPerms').onclick = () => {
+        resultDiv.innerHTML = '';
+    };
 
-        if (data.success) {
-            alert('✅ ' + data.message);
-        } else {
-            alert('❌ ' + data.error);
+    document.getElementById('confirmPerms').onclick = async () => {
+        this.disabled = true;
+        this.textContent = '⏳ Application en cours...';
+        resultDiv.innerHTML = '<div class="loading">⏳ Application des permissions...</div>';
+
+        try {
+            const response = await fetch('/deploy/apply-permissions', { method: 'POST' });
+            const data = await response.json();
+
+            if (data.success) {
+                resultDiv.innerHTML = '<div class="result-success">✅ ' + escapeHtml(data.message) + '</div>';
+            } else {
+                resultDiv.innerHTML = '<div class="result-error">❌ ' + escapeHtml(data.error) + '</div>';
+            }
+        } catch (error) {
+            resultDiv.innerHTML = '<div class="result-error">❌ Erreur: ' + escapeHtml(error.message) + '</div>';
+        } finally {
+            this.disabled = false;
+            this.textContent = '🔐 Restaurer les permissions';
         }
-    } catch (error) {
-        alert('❌ Erreur: ' + error.message);
-    } finally {
-        this.disabled = false;
-        this.textContent = '🔐 Restaurer les permissions';
-    }
+    };
 });
 
 function escapeHtml(text) {
@@ -540,15 +606,28 @@ document.getElementById('btnLoadMigrations')?.addEventListener('click', async fu
 
 // Exécuter les migrations
 document.getElementById('btnRunMigrations')?.addEventListener('click', async function() {
-    if (!confirm('⚠️ Voulez-vous exécuter les migrations en attente?\n\nCela va créer/modifier les tables de la base de données.')) {
-        return;
-    }
-
-    this.disabled = true;
-    this.textContent = '⏳ Exécution en cours...';
-
     const resultDiv = document.getElementById('migrationsResult');
-    resultDiv.innerHTML = '<div class="loading">⏳ Exécution des migrations en cours...</div>';
+
+    // Confirmation inline
+    resultDiv.innerHTML = `
+        <div class="confirm-box">
+            <p><strong>⚠️ Confirmer l'exécution des migrations</strong></p>
+            <p>Cela va créer/modifier les tables de la base de données.</p>
+            <div style="margin-top: 15px;">
+                <button class="btn btn-primary" id="confirmMigrations">✓ Confirmer</button>
+                <button class="btn btn-secondary" id="cancelMigrations">✗ Annuler</button>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('cancelMigrations').onclick = () => {
+        resultDiv.innerHTML = '';
+    };
+
+    document.getElementById('confirmMigrations').onclick = async () => {
+        this.disabled = true;
+        this.textContent = '⏳ Exécution en cours...';
+        resultDiv.innerHTML = '<div class="loading">⏳ Exécution des migrations en cours...</div>';
 
     try {
         const response = await fetch('/deploy/run-migrations', { method: 'POST' });
@@ -614,6 +693,7 @@ document.getElementById('btnRunMigrations')?.addEventListener('click', async fun
         this.disabled = false;
         this.textContent = '▶️ Exécuter les migrations en attente';
     }
+    };
 });
 </script>
 
@@ -1036,5 +1116,35 @@ document.getElementById('btnRunMigrations')?.addEventListener('click', async fun
     border-radius: 3px;
     font-family: 'Courier New', monospace;
     font-size: 0.9em;
+}
+
+/* Boîtes de confirmation */
+.confirm-box {
+    padding: 20px;
+    background: #fff3cd;
+    border: 2px solid #ffc107;
+    border-radius: 8px;
+    margin: 20px 0;
+}
+
+.confirm-box.warning {
+    background: #f8d7da;
+    border-color: #f5c6cb;
+}
+
+.confirm-box p {
+    margin: 10px 0;
+}
+
+.confirm-box strong {
+    color: #856404;
+}
+
+.confirm-box.warning strong {
+    color: #721c24;
+}
+
+.confirm-box .btn {
+    margin-right: 10px;
 }
 </style>

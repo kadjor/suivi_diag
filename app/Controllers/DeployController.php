@@ -474,7 +474,7 @@ class DeployController extends Controller
         ];
 
         try {
-            // Paramètres GitHub (à adapter selon votre configuration)
+            // Paramètres GitHub
             $githubUser = $_POST['github_user'] ?? 'kadjor';
             $githubRepo = $_POST['github_repo'] ?? 'suivi_diag';
             $githubBranch = $_POST['github_branch'] ?? 'main';
@@ -492,26 +492,55 @@ class DeployController extends Controller
 
             // 2. Télécharger le ZIP depuis GitHub
             $this->log('Téléchargement depuis GitHub...');
-            $zipUrl = "https://github.com/{$githubUser}/{$githubRepo}/archive/refs/heads/{$githubBranch}.zip";
+
+            // Encoder correctement le nom de branche (gérer les slashes)
+            $encodedBranch = str_replace('/', '%2F', $githubBranch);
+            $zipUrl = "https://github.com/{$githubUser}/{$githubRepo}/archive/refs/heads/{$encodedBranch}.zip";
+
+            $this->log("URL de téléchargement: {$zipUrl}");
             $zipFile = $this->appDir . '/temp_download.zip';
 
+            // Utiliser curl avec User-Agent pour éviter les blocages
             $ch = curl_init($zipUrl);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
             curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
             curl_setopt($ch, CURLOPT_TIMEOUT, 300);
+            curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
 
             $zipContent = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlError = curl_error($ch);
+            $finalUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
             curl_close($ch);
 
-            if ($httpCode !== 200 || !$zipContent) {
-                throw new \Exception("Échec du téléchargement (HTTP {$httpCode})");
+            $this->log("HTTP Code: {$httpCode}");
+            $this->log("URL finale: {$finalUrl}");
+
+            if ($httpCode !== 200) {
+                $errorMsg = "Échec du téléchargement (HTTP {$httpCode})";
+
+                if ($httpCode === 404) {
+                    $errorMsg .= "\n\nVérifiez que :";
+                    $errorMsg .= "\n- Le dépôt existe : https://github.com/{$githubUser}/{$githubRepo}";
+                    $errorMsg .= "\n- La branche existe : {$githubBranch}";
+                    $errorMsg .= "\n- Le dépôt est PUBLIC";
+                }
+
+                if ($curlError) {
+                    $errorMsg .= "\nErreur cURL: {$curlError}";
+                }
+
+                throw new \Exception($errorMsg);
+            }
+
+            if (!$zipContent) {
+                throw new \Exception("Contenu ZIP vide après téléchargement");
             }
 
             file_put_contents($zipFile, $zipContent);
-            $this->log('✓ Téléchargement terminé');
-            $results['messages'][] = 'Fichiers téléchargés depuis GitHub';
+            $this->log('✓ Téléchargement terminé (' . $this->formatBytes(strlen($zipContent)) . ')');
+            $results['messages'][] = 'Fichiers téléchargés depuis GitHub (' . $this->formatBytes(strlen($zipContent)) . ')';
 
             // 3. Décompresser
             $this->log('Décompression...');
@@ -529,23 +558,44 @@ class DeployController extends Controller
             $zip->close();
             $this->log('✓ Décompression terminée');
 
-            // 4. Copier les fichiers (en excluant certains dossiers)
-            $this->log('Copie des fichiers...');
-            $sourceDir = $extractPath . "/{$githubRepo}-{$githubBranch}";
+            // 4. Trouver le bon dossier extrait (gérer les noms avec slashes)
+            $this->log('Recherche du dossier source...');
 
+            // GitHub remplace les slashes par des tirets dans les noms de dossiers
+            $cleanBranchName = str_replace('/', '-', $githubBranch);
+            $sourceDir = $extractPath . "/{$githubRepo}-{$cleanBranchName}";
+
+            // Si pas trouvé, chercher n'importe quel dossier
+            if (!is_dir($sourceDir)) {
+                $this->log("Dossier attendu non trouvé: {$sourceDir}");
+                $dirs = glob($extractPath . '/*', GLOB_ONLYDIR);
+                if (!empty($dirs)) {
+                    $sourceDir = $dirs[0];
+                    $this->log("Utilisation du dossier trouvé: {$sourceDir}");
+                } else {
+                    throw new \Exception("Aucun dossier trouvé après extraction");
+                }
+            }
+
+            if (!is_dir($sourceDir)) {
+                throw new \Exception("Dossier source introuvable: {$sourceDir}");
+            }
+
+            // 5. Copier les fichiers (en excluant certains dossiers)
+            $this->log('Copie des fichiers...');
             $excludes = ['.git', 'backups', 'storage/logs', 'config/database.php', 'config/email.php'];
             $this->copyDirectory($sourceDir, $this->appDir, $excludes);
 
             $this->log('✓ Fichiers copiés');
             $results['messages'][] = 'Fichiers mis à jour';
 
-            // 5. Nettoyer les fichiers temporaires
+            // 6. Nettoyer les fichiers temporaires
             $this->log('Nettoyage...');
             @unlink($zipFile);
             $this->deleteDirectory($extractPath);
             $this->log('✓ Nettoyage terminé');
 
-            // 6. Restaurer les permissions
+            // 7. Restaurer les permissions
             $this->log('Restauration des permissions...');
             $permissionsResult = $this->restorePermissions();
             if ($permissionsResult['success']) {
@@ -553,7 +603,7 @@ class DeployController extends Controller
                 $this->log('✓ Permissions restaurées');
             }
 
-            // 7. Vider le cache
+            // 8. Vider le cache
             if (is_dir($this->appDir . '/storage/cache')) {
                 $this->clearCache();
                 $results['messages'][] = 'Cache nettoyé';
