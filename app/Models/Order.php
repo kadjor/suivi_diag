@@ -250,4 +250,111 @@ class Order extends Model
             'data' => []
         ];
     }
+
+    /**
+     * Récupère une commande avec toutes les informations (site, diagnostics, etc.)
+     */
+    public function getWithFullDetails($id)
+    {
+        $sql = "SELECT o.*,
+                c.organization_name as client_name, c.email as client_email, c.phone as client_phone,
+                s.label as status_label, s.color as status_color,
+                u1.first_name as creator_first_name, u1.last_name as creator_last_name,
+                u2.first_name as technician_first_name, u2.last_name as technician_last_name,
+                site.name as site_name, site.address as site_address, site.city as site_city,
+                site.numero_groupe, site.numero_lot
+                FROM orders o
+                LEFT JOIN clients c ON o.client_id = c.id
+                LEFT JOIN statuses s ON o.status_id = s.id
+                LEFT JOIN users u1 ON o.created_by = u1.id
+                LEFT JOIN users u2 ON o.assigned_to = u2.id
+                LEFT JOIN sites site ON o.site_id = site.id
+                WHERE o.id = ?";
+
+        $order = $this->queryOne($sql, [$id]);
+
+        if ($order) {
+            // Charger les diagnostics demandés
+            $orderDiagnosticModel = new OrderDiagnostic();
+            $order['diagnostics'] = $orderDiagnosticModel->getByOrder($id);
+        }
+
+        return $order;
+    }
+
+    /**
+     * Récupère le site associé à une commande
+     */
+    public function getSite($orderId)
+    {
+        $siteModel = new Site();
+        $order = $this->find($orderId);
+
+        if ($order && $order['site_id']) {
+            return $siteModel->find($order['site_id']);
+        }
+
+        return null;
+    }
+
+    /**
+     * Récupère les diagnostics demandés pour une commande
+     */
+    public function getDiagnostics($orderId)
+    {
+        $orderDiagnosticModel = new OrderDiagnostic();
+        return $orderDiagnosticModel->getByOrder($orderId);
+    }
+
+    /**
+     * Crée une commande complète avec diagnostics
+     */
+    public function createWithDiagnostics($orderData, $diagnosticTypeIds, $diagnosticNotes = [])
+    {
+        // Créer la commande
+        $orderId = $this->create($orderData);
+
+        if ($orderId && !empty($diagnosticTypeIds)) {
+            // Ajouter les diagnostics
+            $orderDiagnosticModel = new OrderDiagnostic();
+            $orderDiagnosticModel->addDiagnosticsToOrder($orderId, $diagnosticTypeIds, $diagnosticNotes);
+        }
+
+        return $orderId;
+    }
+
+    /**
+     * Crée un site depuis une commande (si adresse fournie mais pas de site)
+     */
+    public function createSiteFromOrder($orderId)
+    {
+        $order = $this->find($orderId);
+
+        if (!$order || $order['site_id']) {
+            return null; // Site déjà existant
+        }
+
+        if (empty($order['execution_address']) || empty($order['execution_city'])) {
+            return null; // Pas assez d'infos
+        }
+
+        $siteModel = new Site();
+        $siteId = $siteModel->create([
+            'client_id' => $order['client_id'],
+            'name' => 'Site - ' . $order['execution_address'],
+            'address' => $order['execution_address'],
+            'city' => $order['execution_city'],
+            'postal_code' => $order['execution_postal_code'],
+            'numero_porte' => $order['execution_numero_porte'],
+            'niveau' => $order['execution_niveau'],
+            'numero_lot' => $order['numero_lot']
+        ]);
+
+        if ($siteId) {
+            // Lier le site à la commande
+            $this->update($orderId, ['site_id' => $siteId]);
+        }
+
+        return $siteId;
+    }
 }

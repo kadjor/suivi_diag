@@ -115,4 +115,122 @@ class Site extends Model
 
         return $this->query($sql, $params);
     }
+
+    /**
+     * Recherche de sites par adresse (autocomplete)
+     */
+    public function searchByAddress($query, $clientId = null)
+    {
+        $where = ["(s.address LIKE ? OR s.city LIKE ? OR s.postal_code LIKE ?)"];
+        $searchParam = "%{$query}%";
+        $params = [$searchParam, $searchParam, $searchParam];
+
+        if ($clientId !== null) {
+            $where[] = "s.client_id = ?";
+            $params[] = $clientId;
+        }
+
+        $sql = "SELECT s.*, c.organization_name as client_name
+                FROM sites s
+                LEFT JOIN clients c ON s.client_id = c.id
+                WHERE " . implode(' AND ', $where) . "
+                ORDER BY s.address
+                LIMIT 20";
+
+        return $this->query($sql, $params);
+    }
+
+    /**
+     * Trouve un site par numéro de groupe et numéro de lot
+     */
+    public function findByGroupAndLot($numeroGroupe, $numeroLot, $clientId)
+    {
+        $sql = "SELECT * FROM sites
+                WHERE numero_groupe = ?
+                AND numero_lot = ?
+                AND client_id = ?
+                LIMIT 1";
+
+        return $this->queryOne($sql, [$numeroGroupe, $numeroLot, $clientId]);
+    }
+
+    /**
+     * Crée ou met à jour un site depuis import Excel
+     */
+    public function createOrUpdateFromImport($clientId, $data)
+    {
+        // Vérifier si le site existe déjà
+        $existing = $this->findByGroupAndLot(
+            $data['numero_groupe'],
+            $data['numero_lot'],
+            $clientId
+        );
+
+        $siteData = [
+            'client_id' => $clientId,
+            'numero_groupe' => $data['numero_groupe'],
+            'numero_lot' => $data['numero_lot'],
+            'nom_groupe' => $data['nom_groupe'] ?? null,
+            'address' => $data['address'],
+            'city' => $data['city'],
+            'postal_code' => $data['postal_code'],
+            'numero_porte' => $data['numero_porte'] ?? null,
+            'niveau' => $data['niveau'] ?? null,
+            'identifiant_fiscal' => $data['identifiant_fiscal'] ?? null,
+            'nommage_rapport' => $data['nommage_rapport'] ?? null,
+            'numero_batiment' => $data['numero_batiment'] ?? null,
+            'numero_entree' => $data['numero_entree'] ?? null,
+            'numero_batiment_brgm' => $data['numero_batiment_brgm'] ?? null,
+            'cadastre' => $data['cadastre'] ?? null,
+            'numero_gardien' => $data['numero_gardien'] ?? null,
+        ];
+
+        if ($existing) {
+            // Mettre à jour
+            $this->update($existing['id'], $siteData);
+            return $existing['id'];
+        } else {
+            // Créer - Ajouter un nom par défaut
+            $siteData['name'] = trim(
+                ($data['nommage_rapport'] ?? '') . ' - ' .
+                ($data['address'] ?? '') . ' - Lot ' .
+                ($data['numero_lot'] ?? '')
+            );
+            return $this->create($siteData);
+        }
+    }
+
+    /**
+     * Récupère les sites du patrimoine avec filtres avancés
+     */
+    public function getPatrimoine($clientId, $filters = [])
+    {
+        $where = ["s.client_id = ?"];
+        $params = [$clientId];
+
+        if (!empty($filters['search'])) {
+            $where[] = "(s.address LIKE ? OR s.numero_lot LIKE ? OR s.numero_groupe LIKE ?)";
+            $search = "%{$filters['search']}%";
+            $params[] = $search;
+            $params[] = $search;
+            $params[] = $search;
+        }
+
+        if (!empty($filters['numero_groupe'])) {
+            $where[] = "s.numero_groupe = ?";
+            $params[] = $filters['numero_groupe'];
+        }
+
+        $sql = "SELECT s.*,
+                COUNT(DISTINCT o.id) as orders_count,
+                MAX(o.created_at) as last_order_date
+                FROM sites s
+                LEFT JOIN orders o ON s.id = o.site_id
+                WHERE " . implode(' AND ', $where) . "
+                GROUP BY s.id
+                ORDER BY s.numero_groupe, s.numero_lot";
+
+        return $this->query($sql, $params);
+    }
 }
+

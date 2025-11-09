@@ -51,7 +51,7 @@ class SiteController extends Controller
             // Recherche d'adresse si fournie
             $searchAddress = $_GET['search'] ?? null;
             if ($searchAddress && $selectedClientId) {
-                $sites = $this->siteModel->searchByAddress($selectedClientId, $searchAddress);
+                $sites = $this->siteModel->searchByAddress($searchAddress, $selectedClientId);
             }
 
             View::render('sites.index', [
@@ -104,7 +104,7 @@ class SiteController extends Controller
             return;
         }
 
-        $sites = $this->siteModel->searchByAddress($clientId, $query);
+        $sites = $this->siteModel->searchByAddress($query, $clientId);
         View::json(['sites' => $sites]);
     }
 
@@ -427,9 +427,9 @@ class SiteController extends Controller
 
                     // Créer ou mettre à jour le site
                     $existingSite = $this->siteModel->findByGroupAndLot(
-                        $clientId,
                         $siteData['numero_groupe'],
-                        $siteData['numero_lot']
+                        $siteData['numero_lot'],
+                        $clientId
                     );
 
                     if ($existingSite) {

@@ -34,4 +34,24 @@ class Client extends Model
                 ORDER BY c.organization_name";
         return $this->query($sql);
     }
+
+    /**
+     * Recherche de clients par nom ou email (autocomplete)
+     */
+    public function search($query)
+    {
+        $searchParam = "%{$query}%";
+
+        $sql = "SELECT c.id, c.organization_name, c.email, c.phone,
+                COUNT(DISTINCT s.id) as sites_count
+                FROM clients c
+                LEFT JOIN sites s ON s.client_id = c.id
+                WHERE c.active = 1
+                AND (c.organization_name LIKE ? OR c.email LIKE ? OR c.phone LIKE ?)
+                GROUP BY c.id
+                ORDER BY c.organization_name
+                LIMIT 20";
+
+        return $this->query($sql, [$searchParam, $searchParam, $searchParam]);
+    }
 }
