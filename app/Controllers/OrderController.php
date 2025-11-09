@@ -98,11 +98,11 @@ class OrderController extends Controller
         }
 
         $clientModel = new Client();
-        $siteModel = new Site();
+        $diagnosticTypeModel = new \Models\DiagnosticType();
 
         View::render('orders.create', [
             'clients' => $clientModel->getAll(),
-            'sites' => $siteModel->getAll()
+            'diagnostic_types' => $diagnosticTypeModel->getActive()
         ]);
     }
 
@@ -113,35 +113,68 @@ class OrderController extends Controller
     {
         if (!Auth::can('create_orders')) {
             View::json(['error' => 'Accès refusé'], 403);
-        }
-
-        $data = [
-            'client_id' => $_POST['client_id'] ?? null,
-            'site_id' => $_POST['site_id'] ?? null,
-            'reference' => $_POST['reference'] ?? $this->orderModel->generateReference(),
-            'diagnostic_types' => $_POST['diagnostic_types'] ?? [],
-            'priority' => $_POST['priority'] ?? 'normal',
-            'notes' => $_POST['notes'] ?? ''
-        ];
-
-        $validator = new Validator($data);
-        $validator->required(['client_id', 'site_id']);
-
-        if (!$validator->validate()) {
-            Session::flash('error', implode(', ', $validator->getErrors()));
-            View::redirect('/orders/create');
+            return;
         }
 
         try {
-            $orderId = $this->orderModel->create([
-                'client_id' => $data['client_id'],
-                'site_id' => $data['site_id'],
-                'reference' => $data['reference'],
-                'status' => 'draft',
-                'priority' => $data['priority'],
-                'notes' => $data['notes'],
-                'created_by' => Auth::id()
-            ]);
+            // Récupérer et valider les données
+            $clientId = $_POST['client_id'] ?? null;
+            $siteId = $_POST['site_id'] ?? null;
+            $numeroLot = $_POST['numero_lot'] ?? null;
+            $diagnosticTypeIds = $_POST['diagnostic_types'] ?? [];
+
+            if (!$clientId) {
+                throw new \Exception('Client requis');
+            }
+
+            if (empty($diagnosticTypeIds)) {
+                throw new \Exception('Au moins un diagnostic doit être sélectionné');
+            }
+
+            // Générer le numéro de commande
+            $orderNumber = $this->orderModel->generateOrderNumber();
+
+            // Gérer l'upload du PDF
+            $pdfPath = null;
+            if (isset($_FILES['bon_de_commande_pdf']) && $_FILES['bon_de_commande_pdf']['error'] === UPLOAD_ERR_OK) {
+                $pdfPath = $this->handlePdfUpload($_FILES['bon_de_commande_pdf'], $orderNumber);
+            }
+
+            // Récupérer le statut initial
+            $statusModel = new \Models\Status();
+            $initialStatus = $statusModel->getByCode('order', 'pending');
+
+            // Préparer les données de la commande
+            $orderData = [
+                'client_id' => $clientId,
+                'site_id' => $siteId,
+                'order_number' => $orderNumber,
+                'numero_lot' => $numeroLot,
+                'execution_address' => $_POST['execution_address'] ?? null,
+                'execution_city' => $_POST['execution_city'] ?? null,
+                'execution_postal_code' => $_POST['execution_postal_code'] ?? null,
+                'execution_numero_porte' => $_POST['execution_numero_porte'] ?? null,
+                'execution_niveau' => $_POST['execution_niveau'] ?? null,
+                'bon_de_commande_pdf' => $pdfPath,
+                'status_id' => $initialStatus['id'] ?? 1,
+                'priority' => $_POST['priority'] ?? 'normal',
+                'notes' => $_POST['notes'] ?? '',
+                'created_by' => Auth::id(),
+                'created_at' => date('Y-m-d H:i:s')
+            ];
+
+            // Créer la commande avec les diagnostics
+            $orderDiagnosticModel = new \Models\OrderDiagnostic();
+            $orderId = $this->orderModel->createWithDiagnostics(
+                $orderData,
+                $diagnosticTypeIds,
+                $_POST['diagnostic_notes'] ?? []
+            );
+
+            // Si aucun site n'est fourni mais qu'on a une adresse, créer le site automatiquement
+            if (!$siteId && !empty($orderData['execution_address'])) {
+                $this->orderModel->createSiteFromOrder($orderId);
+            }
 
             // Créer l'événement de création
             $eventModel = new OrderEvent();
@@ -149,20 +182,47 @@ class OrderController extends Controller
                 'order_id' => $orderId,
                 'event_type' => 'created',
                 'user_id' => Auth::id(),
-                'description' => 'Commande créée'
+                'data' => json_encode(['order_number' => $orderNumber])
             ]);
 
             // Log audit
-            AuditLog::log('order_created', 'orders', $orderId);
+            AuditLog::log('order_created', 'orders', $orderId, [
+                'order_number' => $orderNumber,
+                'client_id' => $clientId
+            ]);
 
-            Session::flash('success', 'Commande créée avec succès');
+            Session::flash('success', "Commande {$orderNumber} créée avec succès");
             View::redirect("/orders/{$orderId}");
 
         } catch (\Exception $e) {
-            log_message("Order creation failed: " . $e->getMessage(), 'error');
-            Session::flash('error', 'Erreur lors de la création de la commande');
+            Session::flash('error', 'Erreur: ' . $e->getMessage());
             View::redirect('/orders/create');
         }
+    }
+
+    /**
+     * Gère l'upload du PDF du bon de commande
+     */
+    private function handlePdfUpload($file, $orderNumber)
+    {
+        $uploadDir = ROOT_PATH . '/public/uploads/orders/';
+        if (!is_dir($uploadDir)) {
+            mkdir($uploadDir, 0755, true);
+        }
+
+        $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        if ($extension !== 'pdf') {
+            throw new \Exception('Seuls les fichiers PDF sont acceptés');
+        }
+
+        $filename = 'BON_' . $orderNumber . '_' . time() . '.pdf';
+        $filepath = $uploadDir . $filename;
+
+        if (!move_uploaded_file($file['tmp_name'], $filepath)) {
+            throw new \Exception('Erreur lors de l\'upload du PDF');
+        }
+
+        return '/uploads/orders/' . $filename;
     }
 
     /**

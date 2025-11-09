@@ -242,11 +242,18 @@ $router->post('/interventions/update-status', 'Controllers\InterventionControlle
 
 // Routes protégées - Sites
 $router->get('/sites', 'Controllers\SiteController@index');
+$router->get('/sites/import', 'Controllers\SiteController@import');
+$router->post('/sites/upload-excel', 'Controllers\SiteController@uploadExcel');
+$router->post('/sites/process-import', 'Controllers\SiteController@processExcelImport');
 $router->get('/sites/create', 'Controllers\SiteController@create');
 $router->post('/sites/store', 'Controllers\SiteController@store');
 $router->get('/sites/{id}', 'Controllers\SiteController@show');
 $router->get('/sites/{id}/edit', 'Controllers\SiteController@edit');
 $router->post('/sites/{id}/update', 'Controllers\SiteController@update');
+
+// API Sites
+$router->get('/api/sites/search-clients', 'Controllers\SiteController@searchClients');
+$router->get('/api/sites/search', 'Controllers\SiteController@searchSites');
 
 // Routes protégées - Clients
 $router->get('/clients', 'Controllers\ClientController@index');
