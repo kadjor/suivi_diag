@@ -234,6 +234,7 @@ $router->post('/orders/{id}/assign', 'Controllers\OrderController@assign');
 $router->post('/orders/{id}/close', 'Controllers\OrderController@close');
 $router->get('/orders/{id}/timeline', 'Controllers\OrderController@timeline');
 $router->post('/orders/{id}/generate-ar', 'Controllers\OrderController@generateAcknowledgment');
+$router->post('/orders/{id}/upload-report', 'Controllers\OrderController@uploadReport');
 
 // Routes protégées - Interventions
 $router->get('/interventions', 'Controllers\InterventionController@index');
@@ -254,6 +255,7 @@ $router->post('/sites/{id}/update', 'Controllers\SiteController@update');
 // API Sites
 $router->get('/api/sites/search-clients', 'Controllers\SiteController@searchClients');
 $router->get('/api/sites/search', 'Controllers\SiteController@searchSites');
+$router->get('/api/sites/search-lot', 'Controllers\SiteController@searchLot');
 
 // Routes protégées - Clients
 $router->get('/clients', 'Controllers\ClientController@index');

@@ -108,6 +108,41 @@ class SiteController extends Controller
         View::json(['sites' => $sites]);
     }
 
+    /**
+     * API: Rechercher des sites par numéro de lot
+     */
+    public function searchLot()
+    {
+        while (ob_get_level()) {
+            ob_end_clean();
+        }
+
+        $clientId = $_GET['client_id'] ?? null;
+        $query = $_GET['q'] ?? '';
+
+        if (!$clientId) {
+            View::json(['error' => 'client_id requis'], 400);
+            return;
+        }
+
+        if (strlen($query) < 2) {
+            View::json(['sites' => []]);
+            return;
+        }
+
+        // Rechercher par numéro de lot
+        $sql = "SELECT s.*
+                FROM sites s
+                WHERE s.client_id = ?
+                AND s.numero_lot LIKE ?
+                ORDER BY s.numero_lot
+                LIMIT 10";
+
+        $sites = $this->siteModel->query($sql, [$clientId, "%{$query}%"]);
+
+        View::json(['sites' => $sites]);
+    }
+
     public function show($id)
     {
         $site = $this->siteModel->find($id);

@@ -144,6 +144,9 @@ class OrderController extends Controller
             $statusModel = new \Models\Status();
             $initialStatus = $statusModel->getByCode('order', 'pending');
 
+            // Récupérer les destinataires des rapports
+            $reportRecipients = $_POST['report_recipients'] ?? null;
+
             // Préparer les données de la commande
             $orderData = [
                 'client_id' => $clientId,
@@ -156,6 +159,7 @@ class OrderController extends Controller
                 'execution_numero_porte' => $_POST['execution_numero_porte'] ?? null,
                 'execution_niveau' => $_POST['execution_niveau'] ?? null,
                 'bon_de_commande_pdf' => $pdfPath,
+                'report_recipients' => $reportRecipients,
                 'status_id' => $initialStatus['id'] ?? 1,
                 'priority' => $_POST['priority'] ?? 'normal',
                 'notes' => $_POST['notes'] ?? '',
@@ -190,6 +194,34 @@ class OrderController extends Controller
                 'order_number' => $orderNumber,
                 'client_id' => $clientId
             ]);
+
+            // Notifier le secrétariat par email
+            try {
+                $clientModel = new Client();
+                $client = $clientModel->find($clientId);
+
+                $creator = Auth::user();
+
+                $order = $this->orderModel->find($orderId);
+                $order['order_number'] = $orderNumber;
+                $order['execution_address'] = $orderData['execution_address'];
+                $order['execution_city'] = $orderData['execution_city'];
+                $order['execution_postal_code'] = $orderData['execution_postal_code'];
+                $order['execution_numero_porte'] = $orderData['execution_numero_porte'];
+                $order['execution_niveau'] = $orderData['execution_niveau'];
+                $order['numero_lot'] = $orderData['numero_lot'];
+
+                \Helpers\Email::notifyOrderCreated($order, $client, $creator);
+
+                // Marquer comme notifié
+                $this->orderModel->update($orderId, [
+                    'notification_sent' => true,
+                    'notification_sent_at' => date('Y-m-d H:i:s')
+                ]);
+            } catch (\Exception $e) {
+                // Ne pas bloquer la création si l'email échoue
+                error_log('Erreur notification: ' . $e->getMessage());
+            }
 
             Session::flash('success', "Commande {$orderNumber} créée avec succès");
             View::redirect("/orders/{$orderId}");
@@ -483,6 +515,95 @@ class OrderController extends Controller
         } catch (\Exception $e) {
             Session::flash('error', 'Erreur lors de la génération : ' . $e->getMessage());
             View::redirect('/orders/' . $id);
+        }
+    }
+
+    /**
+     * Upload d'un rapport par un technicien
+     */
+    public function uploadReport($orderId)
+    {
+        $user = Auth::user();
+
+        // Seuls les techniciens et admins peuvent uploader
+        if (!in_array($user['role_name'], ['technicien', 'admin'])) {
+            View::json(['error' => 'Accès refusé'], 403);
+            return;
+        }
+
+        try {
+            // Vérifier que la commande existe
+            $order = $this->orderModel->find($orderId);
+            if (!$order) {
+                throw new \Exception('Commande introuvable');
+            }
+
+            // Vérifier l'upload
+            if (!isset($_FILES['report_file']) || $_FILES['report_file']['error'] !== UPLOAD_ERR_OK) {
+                throw new \Exception('Fichier requis');
+            }
+
+            $file = $_FILES['report_file'];
+            $extension = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+
+            if ($extension !== 'pdf') {
+                throw new \Exception('Seuls les fichiers PDF sont acceptés');
+            }
+
+            // Upload du fichier
+            $uploadDir = ROOT_PATH . '/public/uploads/reports/';
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0755, true);
+            }
+
+            $filename = 'RAPPORT_' . $order['order_number'] . '_' . time() . '.pdf';
+            $filepath = $uploadDir . $filename;
+
+            if (!move_uploaded_file($file['tmp_name'], $filepath)) {
+                throw new \Exception('Erreur lors de l\'upload');
+            }
+
+            // Enregistrer dans la base
+            $reportModel = new \Models\OrderReport();
+            $reportId = $reportModel->createReport([
+                'order_id' => $orderId,
+                'diagnostic_type_id' => $_POST['diagnostic_type_id'] ?? null,
+                'report_file' => '/uploads/reports/' . $filename,
+                'original_filename' => $file['name'],
+                'uploaded_by' => Auth::id(),
+                'file_size' => $file['size'],
+                'notes' => $_POST['notes'] ?? null
+            ]);
+
+            // Notifier le client par email
+            try {
+                $clientModel = new Client();
+                $client = $clientModel->find($order['client_id']);
+
+                $report = $reportModel->find($reportId);
+                $report['diagnostic_type_name'] = '';
+                if (!empty($_POST['diagnostic_type_id'])) {
+                    $dtModel = new \Models\DiagnosticType();
+                    $dt = $dtModel->find($_POST['diagnostic_type_id']);
+                    $report['diagnostic_type_name'] = $dt['name'] ?? '';
+                }
+
+                $technician = Auth::user();
+
+                \Helpers\Email::notifyReportUploaded($order, $client, $report, $technician);
+
+                // Marquer comme notifié
+                $reportModel->markClientNotified($reportId);
+            } catch (\Exception $e) {
+                error_log('Erreur notification rapport: ' . $e->getMessage());
+            }
+
+            Session::flash('success', 'Rapport uploadé et client notifié');
+            View::redirect("/orders/{$orderId}");
+
+        } catch (\Exception $e) {
+            Session::flash('error', 'Erreur: ' . $e->getMessage());
+            View::redirect("/orders/{$orderId}");
         }
     }
 }
