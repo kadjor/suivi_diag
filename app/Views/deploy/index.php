@@ -1,4 +1,18 @@
-<h1>🚀 Déploiement et Mise à jour</h1>
+<?php
+// Lire la version actuelle
+$versionFile = dirname(__DIR__, 3) . '/VERSION';
+$currentVersion = file_exists($versionFile) ? trim(file_get_contents($versionFile)) : 'Non définie';
+?>
+
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <h1>🚀 Déploiement et Mise à jour</h1>
+    <div style="text-align: right;">
+        <strong>Version actuelle:</strong>
+        <span class="badge badge-info" style="font-size: 1.2em; padding: 8px 15px;">
+            v<?= htmlspecialchars($currentVersion) ?>
+        </span>
+    </div>
+</div>
 
 <div class="deploy-container">
     <!-- Statut -->

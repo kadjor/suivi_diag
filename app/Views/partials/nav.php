@@ -10,6 +10,7 @@ $role = $user['role_name'] ?? '';
         <?php if ($role === 'admin' || $role === 'secretariat'): ?>
             <li><a href="/orders" class="nav-link">Commandes</a></li>
             <li><a href="/sites" class="nav-link">Sites</a></li>
+            <li><a href="/sites/import" class="nav-link">📥 Import Patrimoine</a></li>
             <li><a href="/clients" class="nav-link">Clients</a></li>
         <?php endif; ?>
 
