@@ -265,6 +265,21 @@ $router->get('/clients/{id}', 'Controllers\ClientController@show');
 $router->get('/clients/{id}/edit', 'Controllers\ClientController@edit');
 $router->post('/clients/{id}/update', 'Controllers\ClientController@update');
 
+// Routes protégées - Cessions
+$router->get('/cessions', 'Controllers\CessionController@index');
+$router->get('/cessions/create', 'Controllers\CessionController@create');
+$router->post('/cessions/store', 'Controllers\CessionController@store');
+$router->get('/cessions/{id}', 'Controllers\CessionController@show');
+$router->post('/cessions/{id}/add-site', 'Controllers\CessionController@addSite');
+$router->post('/cessions/{id}/remove-site', 'Controllers\CessionController@removeSite');
+$router->post('/cessions/{id}/submit', 'Controllers\CessionController@submit');
+$router->post('/cessions/{id}/validate', 'Controllers\CessionController@validate');
+$router->post('/cessions/{id}/start-transfer', 'Controllers\CessionController@startTransfer');
+$router->post('/cessions/{id}/cancel', 'Controllers\CessionController@cancel');
+
+// API Cessions
+$router->get('/api/cessions/sites-by-client', 'Controllers\CessionController@getSitesByClient');
+
 // Routes protégées - Cartographie
 $router->get('/map', 'Controllers\MapController@index');
 $router->get('/map/data', 'Controllers\MapController@getData');
