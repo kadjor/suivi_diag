@@ -167,6 +167,11 @@ $currentVersion = file_exists($versionFile) ? trim(file_get_contents($versionFil
                     </tbody>
                 </table>
             </div>
+            <?php else: ?>
+            <div class="alert" style="margin-top: 15px; padding: 12px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px;">
+                <strong>ℹ️ Information:</strong> Aucune branche personnalisée enregistrée.<br>
+                <small>Si vous venez de mettre à jour le code, exécutez la <strong>migration 008</strong> dans la section "Migrations" ci-dessous pour activer cette fonctionnalité.</small>
+            </div>
             <?php endif; ?>
         </div>
         <?php endif; ?>

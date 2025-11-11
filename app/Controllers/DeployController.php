@@ -40,9 +40,15 @@ class DeployController extends Controller
         $hasChanges = $isGitRepo ? $this->hasLocalChanges() : false;
         $deployLogs = $this->getDeployLogs(20);
 
-        // Récupérer les branches personnalisées
-        $customBranchModel = new \Models\CustomBranch();
-        $customBranches = $customBranchModel->getAll();
+        // Récupérer les branches personnalisées (gérer le cas où la table n'existe pas encore)
+        $customBranches = [];
+        try {
+            $customBranchModel = new \Models\CustomBranch();
+            $customBranches = $customBranchModel->getAll();
+        } catch (\Exception $e) {
+            // La table n'existe pas encore - migration 008 doit être exécutée
+            error_log('CustomBranch table not found: ' . $e->getMessage());
+        }
 
         View::render('deploy.index', [
             'isGitRepo' => $isGitRepo,
@@ -1309,10 +1315,16 @@ class DeployController extends Controller
             return;
         }
 
-        $customBranchModel = new \Models\CustomBranch();
-        $result = $customBranchModel->addBranch($branchName, $description, Auth::id());
-
-        View::json($result);
+        try {
+            $customBranchModel = new \Models\CustomBranch();
+            $result = $customBranchModel->addBranch($branchName, $description, Auth::id());
+            View::json($result);
+        } catch (\Exception $e) {
+            View::json([
+                'success' => false,
+                'error' => 'La table custom_branches n\'existe pas. Veuillez exécuter la migration 008.'
+            ], 500);
+        }
     }
 
     /**
@@ -1327,9 +1339,15 @@ class DeployController extends Controller
             return;
         }
 
-        $customBranchModel = new \Models\CustomBranch();
-        $result = $customBranchModel->deleteBranch($branchId);
-
-        View::json($result);
+        try {
+            $customBranchModel = new \Models\CustomBranch();
+            $result = $customBranchModel->deleteBranch($branchId);
+            View::json($result);
+        } catch (\Exception $e) {
+            View::json([
+                'success' => false,
+                'error' => 'La table custom_branches n\'existe pas. Veuillez exécuter la migration 008.'
+            ], 500);
+        }
     }
 }
