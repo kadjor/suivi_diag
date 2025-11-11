@@ -45,9 +45,9 @@ class Database
                 $config['options'] ?? []
             );
 
-            log_message('Database connection established', 'info');
+            @error_log('Database connection established');
         } catch (PDOException $e) {
-            log_message('Database connection failed: ' . $e->getMessage(), 'error');
+            @error_log('Database connection failed: ' . $e->getMessage());
             throw $e;
         }
     }
