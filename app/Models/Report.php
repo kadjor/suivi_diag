@@ -78,8 +78,8 @@ class Report extends Model
                 LEFT JOIN orders o ON r.order_id = o.id
                 LEFT JOIN clients c ON o.client_id = c.id
                 LEFT JOIN users u ON r.uploaded_by = u.id
-                WHERE r.file_name LIKE ?
-                   OR r.title LIKE ?
+                WHERE r.filename LIKE ?
+                   OR r.original_filename LIKE ?
                    OR o.order_number LIKE ?
                    OR c.organization_name LIKE ?
                 ORDER BY r.uploaded_at DESC";

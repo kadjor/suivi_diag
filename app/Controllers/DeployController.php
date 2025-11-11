@@ -40,11 +40,16 @@ class DeployController extends Controller
         $hasChanges = $isGitRepo ? $this->hasLocalChanges() : false;
         $deployLogs = $this->getDeployLogs(20);
 
+        // Récupérer les branches personnalisées
+        $customBranchModel = new \Models\CustomBranch();
+        $customBranches = $customBranchModel->getAll();
+
         View::render('deploy.index', [
             'isGitRepo' => $isGitRepo,
             'gitStatus' => $gitStatus,
             'currentBranch' => $currentBranch,
             'branches' => $branches,
+            'customBranches' => $customBranches,
             'lastCommits' => $lastCommits,
             'hasChanges' => $hasChanges,
             'deployLogs' => $deployLogs,
@@ -1283,5 +1288,48 @@ class DeployController extends Controller
                 'error' => $e->getMessage()
             ], 400);
         }
+    }
+
+    /**
+     * Ajoute une branche personnalisée
+     */
+    public function addCustomBranch()
+    {
+        $branchName = $_POST['branch_name'] ?? null;
+        $description = $_POST['description'] ?? '';
+
+        if (!$branchName) {
+            View::json(['success' => false, 'error' => 'Nom de branche requis'], 400);
+            return;
+        }
+
+        // Valider le nom de branche (caractères alphanumériques, tirets, underscores, slashes)
+        if (!preg_match('/^[a-zA-Z0-9\/_-]+$/', $branchName)) {
+            View::json(['success' => false, 'error' => 'Nom de branche invalide'], 400);
+            return;
+        }
+
+        $customBranchModel = new \Models\CustomBranch();
+        $result = $customBranchModel->addBranch($branchName, $description, Auth::id());
+
+        View::json($result);
+    }
+
+    /**
+     * Supprime une branche personnalisée
+     */
+    public function deleteCustomBranch()
+    {
+        $branchId = $_POST['branch_id'] ?? null;
+
+        if (!$branchId) {
+            View::json(['success' => false, 'error' => 'ID de branche requis'], 400);
+            return;
+        }
+
+        $customBranchModel = new \Models\CustomBranch();
+        $result = $customBranchModel->deleteBranch($branchId);
+
+        View::json($result);
     }
 }
