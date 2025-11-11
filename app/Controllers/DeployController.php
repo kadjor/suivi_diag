@@ -1073,16 +1073,39 @@ class DeployController extends Controller
     {
         try {
             $db = \Core\Database::getConnection();
-            $sql = "CREATE TABLE IF NOT EXISTS `migrations` (
-                `id` int(11) NOT NULL AUTO_INCREMENT,
-                `migration` varchar(255) NOT NULL,
-                `executed_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (`id`),
-                UNIQUE KEY `migration` (`migration`)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
 
-            $db->query($sql);
-            $this->log('✓ Table migrations créée');
+            // Vérifier si la table existe
+            $result = $db->query("SHOW TABLES LIKE 'migrations'");
+            $tableExists = $result && $result->num_rows > 0;
+
+            if ($tableExists) {
+                // Vérifier si la colonne 'migration' existe
+                $columnsResult = $db->query("SHOW COLUMNS FROM migrations LIKE 'migration'");
+                $hasCorrectSchema = $columnsResult && $columnsResult->num_rows > 0;
+
+                if (!$hasCorrectSchema) {
+                    // La table existe mais avec un mauvais schéma, la recréer
+                    $this->log('⚠ Table migrations existe avec un mauvais schéma, recréation...');
+                    $db->query("DROP TABLE IF EXISTS `migrations`");
+                    $tableExists = false;
+                }
+            }
+
+            if (!$tableExists) {
+                // Créer la table avec le bon schéma
+                $sql = "CREATE TABLE `migrations` (
+                    `id` int(11) NOT NULL AUTO_INCREMENT,
+                    `migration` varchar(255) NOT NULL,
+                    `executed_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+                    PRIMARY KEY (`id`),
+                    UNIQUE KEY `migration` (`migration`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+
+                $db->query($sql);
+                $this->log('✓ Table migrations créée avec le bon schéma');
+            } else {
+                $this->log('✓ Table migrations existe déjà avec le bon schéma');
+            }
 
         } catch (\Exception $e) {
             $this->log('✗ Erreur création table migrations: ' . $e->getMessage());
