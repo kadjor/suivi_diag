@@ -79,13 +79,38 @@ if ($requestUri === '/deploy/migrations' || strpos($requestUri, '/deploy/migrati
     try {
         $migrationsDir = ROOT_PATH . '/database/migrations';
         $migrations = [];
+        $debug = [];
+
+        // Debug: vérifier le chemin
+        $debug['root_path'] = ROOT_PATH;
+        $debug['migrations_dir'] = $migrationsDir;
+        $debug['dir_exists'] = is_dir($migrationsDir);
+        $debug['dir_readable'] = is_readable($migrationsDir);
 
         if (!is_dir($migrationsDir)) {
             header('Content-Type: application/json; charset=utf-8', true);
-            die(json_encode(['migrations' => [], 'success' => true]));
+            die(json_encode([
+                'migrations' => [],
+                'success' => true,
+                'debug' => $debug,
+                'message' => 'Le dossier database/migrations n\'existe pas'
+            ]));
         }
 
-        $files = @glob($migrationsDir . '/*.sql');
+        if (!is_readable($migrationsDir)) {
+            header('Content-Type: application/json; charset=utf-8', true);
+            die(json_encode([
+                'migrations' => [],
+                'success' => false,
+                'debug' => $debug,
+                'error' => 'Le dossier database/migrations n\'est pas accessible en lecture'
+            ]));
+        }
+
+        $files = glob($migrationsDir . '/*.sql');
+        $debug['glob_pattern'] = $migrationsDir . '/*.sql';
+        $debug['files_found'] = $files !== false ? count($files) : 0;
+
         if ($files === false || $files === null) {
             $files = [];
         }
@@ -122,7 +147,11 @@ if ($requestUri === '/deploy/migrations' || strpos($requestUri, '/deploy/migrati
         }
 
         header('Content-Type: application/json; charset=utf-8', true);
-        die(json_encode(['migrations' => $migrations, 'success' => true]));
+        die(json_encode([
+            'migrations' => $migrations,
+            'success' => true,
+            'debug' => $debug
+        ]));
 
     } catch (\Throwable $e) {
         while (@ob_get_level() > 0) {

@@ -923,11 +923,39 @@ document.getElementById('btnLoadMigrations')?.addEventListener('click', async fu
         } else {
             html = '<p class="no-data">Aucune migration trouvée dans database/migrations/</p>';
             btnRunMigrations.style.display = 'none';
+
+            // Afficher les infos de debug si disponibles
+            if (data.debug) {
+                html += '<div class="alert alert-info" style="margin-top: 15px; font-size: 12px;">';
+                html += '<strong>ℹ️ Informations de débogage:</strong><br>';
+                html += '<code style="display: block; background: #f5f5f5; padding: 10px; margin-top: 5px; white-space: pre;">';
+                html += 'ROOT_PATH: ' + escapeHtml(data.debug.root_path || 'N/A') + '\n';
+                html += 'Dossier migrations: ' + escapeHtml(data.debug.migrations_dir || 'N/A') + '\n';
+                html += 'Dossier existe: ' + (data.debug.dir_exists ? '✓ Oui' : '✗ Non') + '\n';
+                html += 'Dossier accessible: ' + (data.debug.dir_readable ? '✓ Oui' : '✗ Non') + '\n';
+                html += 'Pattern glob: ' + escapeHtml(data.debug.glob_pattern || 'N/A') + '\n';
+                html += 'Fichiers trouvés: ' + (data.debug.files_found || 0);
+                html += '</code></div>';
+            }
+
+            if (data.message) {
+                html += '<div class="alert alert-warning" style="margin-top: 10px;">' + escapeHtml(data.message) + '</div>';
+            }
+
+            if (data.error) {
+                html += '<div class="alert alert-danger" style="margin-top: 10px;">' + escapeHtml(data.error) + '</div>';
+            }
         }
 
         migrationsListDiv.innerHTML = html;
     } catch (error) {
-        migrationsListDiv.innerHTML = '<div class="result-error">❌ Erreur: ' + escapeHtml(error.message) + '</div>';
+        let errorHtml = '<div class="result-error">❌ Erreur: ' + escapeHtml(error.message) + '</div>';
+        errorHtml += '<div class="alert alert-info" style="margin-top: 15px; font-size: 12px;">';
+        errorHtml += '<strong>Détails de l\'erreur:</strong><br>';
+        errorHtml += '<code style="display: block; background: #f5f5f5; padding: 10px; margin-top: 5px;">';
+        errorHtml += error.stack || error.toString();
+        errorHtml += '</code></div>';
+        migrationsListDiv.innerHTML = errorHtml;
     } finally {
         this.disabled = false;
         this.textContent = '📋 Charger les migrations';
