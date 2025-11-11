@@ -914,7 +914,7 @@ class DeployController extends Controller
             }
 
             echo "\n=== TEST CONNEXION DB ===\n";
-            $db = \Core\Database::getInstance()->getConnection();
+            $db = \Core\Database::getConnection();
             echo "Connexion DB: OK\n";
 
             echo "\n=== FIN DIAGNOSTIC ===\n";
@@ -1010,7 +1010,7 @@ class DeployController extends Controller
     private function isMigrationExecutedSafe($migrationName)
     {
         try {
-            $db = \Core\Database::getInstance()->getConnection();
+            $db = \Core\Database::getConnection();
 
             // Vérifier si la table migrations existe
             $result = @$db->query("SHOW TABLES LIKE 'migrations'");
@@ -1043,7 +1043,7 @@ class DeployController extends Controller
     private function isMigrationExecuted($migrationName)
     {
         try {
-            $db = \Core\Database::getInstance()->getConnection();
+            $db = \Core\Database::getConnection();
 
             // Vérifier si la table migrations existe
             $result = $db->query("SHOW TABLES LIKE 'migrations'");
@@ -1072,7 +1072,7 @@ class DeployController extends Controller
     private function createMigrationsTable()
     {
         try {
-            $db = \Core\Database::getInstance()->getConnection();
+            $db = \Core\Database::getConnection();
             $sql = "CREATE TABLE IF NOT EXISTS `migrations` (
                 `id` int(11) NOT NULL AUTO_INCREMENT,
                 `migration` varchar(255) NOT NULL,
@@ -1136,7 +1136,7 @@ class DeployController extends Controller
             }
 
             sort($files);
-            $db = \Core\Database::getInstance()->getConnection();
+            $db = \Core\Database::getConnection();
 
             foreach ($files as $file) {
                 $migrationName = basename($file);
@@ -1277,7 +1277,7 @@ class DeployController extends Controller
         $this->log('Utilisateur: ' . Auth::user()['email']);
 
         try {
-            $db = \Core\Database::getInstance()->getConnection();
+            $db = \Core\Database::getConnection();
             $db->query("DROP TABLE IF EXISTS migrations");
             $this->createMigrationsTable();
 
