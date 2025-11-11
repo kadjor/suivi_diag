@@ -24,29 +24,41 @@ class ReportController extends Controller
 
     public function index()
     {
-        $user = Auth::user();
-        $searchTerm = $_GET['search'] ?? '';
+        try {
+            $user = Auth::user();
+            $searchTerm = $_GET['search'] ?? '';
 
-        if ($searchTerm) {
-            $reports = $this->reportModel->search($searchTerm);
-        } else {
-            $reports = $user['role_name'] === 'client'
-                ? $this->reportModel->getByClient($user['client_id'])
-                : $this->reportModel->getAll();
+            if ($searchTerm) {
+                $reports = $this->reportModel->search($searchTerm);
+            } else {
+                $reports = $user['role_name'] === 'client'
+                    ? $this->reportModel->getByClient($user['client_id'])
+                    : $this->reportModel->getAll();
+            }
+
+            $stats = $this->reportModel->getStats();
+
+            View::render('reports.index', [
+                'reports' => $reports ?? [],
+                'stats' => $stats ?? ['total' => 0, 'total_size' => 0, 'orders_with_reports' => 0],
+                'searchTerm' => $searchTerm
+            ]);
+        } catch (\Exception $e) {
+            error_log('Error in ReportController::index: ' . $e->getMessage());
+
+            // Afficher une page d'erreur au lieu de rediriger
+            View::render('reports.index', [
+                'reports' => [],
+                'stats' => ['total' => 0, 'total_size' => 0, 'orders_with_reports' => 0],
+                'searchTerm' => '',
+                'error' => 'Une erreur est survenue lors du chargement des rapports: ' . $e->getMessage()
+            ]);
         }
-
-        $stats = $this->reportModel->getStats();
-
-        View::render('reports.index', [
-            'reports' => $reports,
-            'stats' => $stats,
-            'searchTerm' => $searchTerm
-        ]);
     }
 
     public function upload()
     {
-        if (!Auth::can('upload_reports')) {
+        if (!Auth::can('reports.create')) {
             View::json(['error' => 'Accès refusé'], 403);
         }
 
@@ -134,7 +146,7 @@ class ReportController extends Controller
      */
     public function importExcel()
     {
-        if (!Auth::can('manage_reports')) {
+        if (!Auth::can('reports.update')) {
             View::json(['error' => 'Accès refusé'], 403);
         }
 
@@ -169,7 +181,7 @@ class ReportController extends Controller
      */
     public function confirmImport()
     {
-        if (!Auth::can('manage_reports')) {
+        if (!Auth::can('reports.update')) {
             View::json(['error' => 'Accès refusé'], 403);
         }
 

@@ -35,6 +35,7 @@ class DeployController extends Controller
         // Récupérer les informations Git si applicable
         $gitStatus = $isGitRepo ? $this->getGitStatus() : ['error' => 'Non-Git'];
         $currentBranch = $isGitRepo ? $this->getCurrentBranch() : 'N/A';
+        $branches = $isGitRepo ? $this->getAllBranches() : [];
         $lastCommits = $isGitRepo ? $this->getLastCommits(10) : [];
         $hasChanges = $isGitRepo ? $this->hasLocalChanges() : false;
         $deployLogs = $this->getDeployLogs(20);
@@ -43,6 +44,7 @@ class DeployController extends Controller
             'isGitRepo' => $isGitRepo,
             'gitStatus' => $gitStatus,
             'currentBranch' => $currentBranch,
+            'branches' => $branches,
             'lastCommits' => $lastCommits,
             'hasChanges' => $hasChanges,
             'deployLogs' => $deployLogs,
@@ -89,6 +91,49 @@ class DeployController extends Controller
         }
 
         return trim($output[0]);
+    }
+
+    /**
+     * Récupère toutes les branches (locales et distantes)
+     */
+    private function getAllBranches()
+    {
+        $output = [];
+
+        // Récupérer les branches locales et distantes
+        exec("cd {$this->appDir} && git branch -a 2>&1", $output, $returnCode);
+
+        if ($returnCode !== 0) {
+            return [];
+        }
+
+        $branches = [
+            'local' => [],
+            'remote' => []
+        ];
+
+        foreach ($output as $line) {
+            $line = trim($line);
+
+            // Ignorer les lignes vides ou avec HEAD
+            if (empty($line) || strpos($line, 'HEAD') !== false) {
+                continue;
+            }
+
+            // Enlever l'indicateur de branche courante (*)
+            $line = preg_replace('/^\*\s+/', '', $line);
+
+            // Vérifier si c'est une branche distante
+            if (strpos($line, 'remotes/') === 0) {
+                // Nettoyer le nom de la branche distante
+                $branchName = str_replace('remotes/origin/', '', $line);
+                $branches['remote'][] = $branchName;
+            } else {
+                $branches['local'][] = $line;
+            }
+        }
+
+        return $branches;
     }
 
     /**
@@ -210,6 +255,113 @@ class DeployController extends Controller
             $results['errors'][] = $e->getMessage();
             $this->log('✗ ERREUR: ' . $e->getMessage());
             $this->log('===== DÉPLOIEMENT ÉCHOUÉ =====');
+        }
+
+        View::json($results);
+    }
+
+    /**
+     * Change de branche Git
+     */
+    public function checkoutBranch()
+    {
+        $branch = $_POST['branch'] ?? null;
+
+        if (!$branch) {
+            View::json(['success' => false, 'error' => 'Branche non spécifiée']);
+            return;
+        }
+
+        $this->log('===== CHANGEMENT DE BRANCHE =====');
+        $this->log('Utilisateur: ' . Auth::user()['email']);
+        $this->log('Branche cible: ' . $branch);
+        $this->log('Date: ' . date('Y-m-d H:i:s'));
+
+        $results = [
+            'success' => false,
+            'messages' => [],
+            'errors' => []
+        ];
+
+        try {
+            // 1. Créer un backup avant le changement
+            $this->log('Création du backup...');
+            $backupResult = $this->createBackup();
+            if (!$backupResult['success']) {
+                throw new \Exception('Échec de la création du backup: ' . $backupResult['error']);
+            }
+            $results['messages'][] = 'Backup créé: ' . $backupResult['file'];
+            $this->log('✓ Backup créé: ' . $backupResult['file']);
+
+            // 2. Vérifier les changements locaux
+            if ($this->hasLocalChanges()) {
+                $this->log('⚠ Changements locaux détectés - stash');
+                exec("cd {$this->appDir} && git stash 2>&1", $output, $returnCode);
+                $results['messages'][] = 'Changements locaux mis de côté (stash)';
+            }
+
+            // 3. Fetch pour s'assurer d'avoir toutes les branches
+            $this->log('Récupération des branches distantes...');
+            exec("cd {$this->appDir} && git fetch origin 2>&1", $output, $returnCode);
+            if ($returnCode !== 0) {
+                throw new \Exception('Erreur git fetch: ' . implode("\n", $output));
+            }
+            $this->log('✓ Fetch terminé');
+
+            // 4. Checkout de la branche
+            $this->log('Changement vers la branche ' . $branch . '...');
+            $output = [];
+
+            // Si c'est une branche distante, créer une branche locale qui la suit
+            if (strpos($branch, 'origin/') === 0) {
+                $localBranch = str_replace('origin/', '', $branch);
+                exec("cd {$this->appDir} && git checkout -b {$localBranch} {$branch} 2>&1", $output, $returnCode);
+            } else {
+                // C'est une branche locale, checkout direct
+                exec("cd {$this->appDir} && git checkout {$branch} 2>&1", $output, $returnCode);
+            }
+
+            if ($returnCode !== 0) {
+                throw new \Exception('Erreur git checkout: ' . implode("\n", $output));
+            }
+
+            $checkoutOutput = implode("\n", $output);
+            $results['messages'][] = $checkoutOutput;
+            $this->log('✓ Checkout terminé: ' . $checkoutOutput);
+
+            // 5. Pull pour mettre à jour
+            $this->log('Mise à jour de la branche...');
+            exec("cd {$this->appDir} && git pull origin {$branch} 2>&1", $output, $returnCode);
+            if ($returnCode !== 0) {
+                $this->log('⚠ Pull échoué (peut-être déjà à jour)');
+            } else {
+                $this->log('✓ Pull terminé');
+            }
+
+            // 6. Restaurer les permissions
+            $this->log('Restauration des permissions...');
+            $permissionsResult = $this->restorePermissions();
+            if ($permissionsResult['success']) {
+                $results['messages'][] = 'Permissions restaurées';
+                $this->log('✓ Permissions restaurées');
+            }
+
+            // 7. Vider le cache si le dossier existe
+            if (is_dir($this->appDir . '/storage/cache')) {
+                $this->log('Nettoyage du cache...');
+                $this->clearCache();
+                $results['messages'][] = 'Cache nettoyé';
+                $this->log('✓ Cache nettoyé');
+            }
+
+            $results['success'] = true;
+            $results['messages'][] = 'Changement vers la branche ' . $branch . ' réussi !';
+            $this->log('===== CHANGEMENT DE BRANCHE RÉUSSI =====');
+
+        } catch (\Exception $e) {
+            $results['errors'][] = $e->getMessage();
+            $this->log('✗ ERREUR: ' . $e->getMessage());
+            $this->log('===== CHANGEMENT DE BRANCHE ÉCHOUÉ =====');
         }
 
         View::json($results);

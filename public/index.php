@@ -335,6 +335,7 @@ $router->post('/admin/statuses/update-color', 'Controllers\AdminController@updat
 // Routes protégées - Déploiement (admin seulement)
 $router->get('/deploy', 'Controllers\DeployController@index');
 $router->post('/deploy/pull', 'Controllers\DeployController@pull');
+$router->post('/deploy/checkout-branch', 'Controllers\DeployController@checkoutBranch');
 $router->post('/deploy/download-github', 'Controllers\DeployController@downloadFromGithub');
 $router->post('/deploy/apply-permissions', 'Controllers\DeployController@applyPermissions');
 $router->get('/deploy/diff', 'Controllers\DeployController@diff');

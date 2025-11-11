@@ -74,6 +74,40 @@ $currentVersion = file_exists($versionFile) ? trim(file_get_contents($versionFil
 
         <?php if ($isGitRepo): ?>
         <!-- Actions Git -->
+
+        <!-- Changement de branche -->
+        <?php if (!empty($branches['local']) || !empty($branches['remote'])): ?>
+        <div class="github-form" style="margin-bottom: 20px;">
+            <h3>🌿 Changer de branche</h3>
+            <div class="form-row">
+                <div class="form-group" style="flex: 1;">
+                    <label for="git_branch_select">Branche:</label>
+                    <select id="git_branch_select" class="form-control">
+                        <optgroup label="Branches locales">
+                            <?php foreach ($branches['local'] ?? [] as $branch): ?>
+                                <option value="<?= htmlspecialchars($branch) ?>" <?= $branch === $currentBranch ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($branch) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </optgroup>
+                        <optgroup label="Branches distantes">
+                            <?php foreach ($branches['remote'] ?? [] as $branch): ?>
+                                <option value="<?= htmlspecialchars($branch) ?>">
+                                    origin/<?= htmlspecialchars($branch) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </optgroup>
+                    </select>
+                </div>
+                <div style="display: flex; align-items: flex-end;">
+                    <button id="btnCheckoutBranch" class="btn btn-warning">
+                        🔀 Changer de branche
+                    </button>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+
         <div class="action-buttons">
             <button id="btnDiff" class="btn btn-info">
                 📋 Voir les différences
@@ -112,7 +146,29 @@ $currentVersion = file_exists($versionFile) ? trim(file_get_contents($versionFil
                 </div>
                 <div class="form-group">
                     <label for="github_branch">Branche:</label>
-                    <input type="text" id="github_branch" value="main" class="form-control">
+                    <select id="github_branch" class="form-control">
+                        <?php if (!empty($branches['local']) || !empty($branches['remote'])): ?>
+                            <optgroup label="Branches locales">
+                                <?php foreach ($branches['local'] ?? [] as $branch): ?>
+                                    <option value="<?= htmlspecialchars($branch) ?>" <?= $branch === $currentBranch ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($branch) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </optgroup>
+                            <optgroup label="Branches distantes">
+                                <?php foreach ($branches['remote'] ?? [] as $branch): ?>
+                                    <option value="<?= htmlspecialchars($branch) ?>" <?= $branch === $currentBranch ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($branch) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </optgroup>
+                        <?php else: ?>
+                            <option value="main" selected>main</option>
+                            <option value="master">master</option>
+                            <option value="develop">develop</option>
+                            <option value="staging">staging</option>
+                        <?php endif; ?>
+                    </select>
                 </div>
             </div>
             <div class="action-buttons">
@@ -325,6 +381,83 @@ if (btnPull) {
             this.disabled = false;
             this.textContent = '⬇️ Mettre à jour (Git Pull)';
         }
+        };
+    });
+}
+
+// Checkout Branch (changer de branche)
+const btnCheckoutBranch = document.getElementById('btnCheckoutBranch');
+if (btnCheckoutBranch) {
+    btnCheckoutBranch.addEventListener('click', async function() {
+        const resultDiv = document.getElementById('actionResult');
+        const branchSelect = document.getElementById('git_branch_select');
+        const selectedBranch = branchSelect.value;
+
+        if (!selectedBranch) {
+            resultDiv.innerHTML = '<div class="result-error">❌ Veuillez sélectionner une branche</div>';
+            return;
+        }
+
+        // Confirmation
+        resultDiv.innerHTML = `
+            <div class="confirm-box">
+                <p><strong>⚠️ Confirmer le changement de branche</strong></p>
+                <p>Vous allez changer vers la branche: <strong>${escapeHtml(selectedBranch)}</strong></p>
+                <p>Un backup sera automatiquement créé.</p>
+                <div style="margin-top: 15px;">
+                    <button class="btn btn-primary" id="confirmCheckout">✓ Confirmer</button>
+                    <button class="btn btn-secondary" id="cancelCheckout">✗ Annuler</button>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('cancelCheckout').onclick = () => {
+            resultDiv.innerHTML = '';
+        };
+
+        document.getElementById('confirmCheckout').onclick = async () => {
+            this.disabled = true;
+            this.textContent = '⏳ Changement en cours...';
+            resultDiv.innerHTML = '<div class="loading">⏳ Changement de branche en cours...</div>';
+
+            try {
+                const formData = new FormData();
+                formData.append('branch', selectedBranch);
+
+                const response = await fetch('/deploy/checkout-branch', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                let resultHtml = '';
+
+                if (data.success) {
+                    resultHtml = '<div class="result-success"><h3>✅ Changement de branche réussi !</h3>';
+                    resultHtml += '<p>Branche actuelle: <strong>' + escapeHtml(selectedBranch) + '</strong></p>';
+                    resultHtml += '<p>La page va se recharger...</p>';
+                    resultHtml += '</div>';
+
+                    // Recharger après 2 secondes
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
+                } else {
+                    resultHtml = '<div class="result-error"><h3>❌ Erreur lors du changement de branche</h3>';
+                    if (data.error) {
+                        resultHtml += '<p>' + escapeHtml(data.error) + '</p>';
+                    }
+                    resultHtml += '</div>';
+                }
+
+                resultDiv.innerHTML = resultHtml;
+
+            } catch (error) {
+                resultDiv.innerHTML = '<div class="result-error">❌ Erreur: ' + escapeHtml(error.message) + '</div>';
+            } finally {
+                this.disabled = false;
+                this.textContent = '🔀 Changer de branche';
+            }
         };
     });
 }
