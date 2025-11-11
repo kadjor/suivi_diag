@@ -1,0 +1,25 @@
+{
+    "name": "kadjor/suivi_diag",
+    "description": "Plateforme de gestion de diagnostics immobiliers",
+    "type": "project",
+    "require": {
+        "php": ">=7.4",
+        "phpoffice/phpspreadsheet": "^1.29",
+        "phpmailer/phpmailer": "^6.8",
+        "setasign/fpdf": "^1.8"
+    },
+    "autoload": {
+        "psr-4": {
+            "Controllers\\": "app/Controllers/",
+            "Models\\": "app/Models/",
+            "Core\\": "app/Core/"
+        }
+    },
+    "config": {
+        "optimize-autoloader": true,
+        "preferred-install": "dist",
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

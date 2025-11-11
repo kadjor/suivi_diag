@@ -33,6 +33,12 @@ if ($requestUri === '/deploy/migrations' || strpos($requestUri, '/deploy/migrati
     if (!defined('APP_PATH')) define('APP_PATH', ROOT_PATH . '/app');
     if (!defined('CONFIG_PATH')) define('CONFIG_PATH', ROOT_PATH . '/config');
 
+    // Chargement de l'autoloader Composer
+    $composerAutoload = ROOT_PATH . '/vendor/autoload.php';
+    if (file_exists($composerAutoload)) {
+        @require_once $composerAutoload;
+    }
+
     // Autoloader minimal
     spl_autoload_register(function ($class) {
         $file = APP_PATH . '/' . str_replace('\\', '/', $class) . '.php';
@@ -124,6 +130,12 @@ if (!defined('PUBLIC_PATH')) define('PUBLIC_PATH', ROOT_PATH . '/public');
 if (!defined('UPLOAD_PATH')) define('UPLOAD_PATH', PUBLIC_PATH . '/uploads');
 if (!defined('LOG_PATH')) define('LOG_PATH', ROOT_PATH . '/logs');
 if (!defined('LIB_PATH')) define('LIB_PATH', ROOT_PATH . '/libs');
+
+// Chargement de l'autoloader Composer (pour les bibliothèques tierces)
+$composerAutoload = ROOT_PATH . '/vendor/autoload.php';
+if (file_exists($composerAutoload)) {
+    require_once $composerAutoload;
+}
 
 // Chargement de la configuration
 $config = require CONFIG_PATH . '/app.php';

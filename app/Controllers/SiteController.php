@@ -339,8 +339,6 @@ class SiteController extends Controller
             }
 
             // Lire les en-têtes et premières lignes avec PhpSpreadsheet
-            require_once ROOT_PATH . '/libs/PhpSpreadsheet/autoload.php';
-
             $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($filepath);
             $worksheet = $spreadsheet->getActiveSheet();
             $headers = [];
@@ -407,7 +405,6 @@ class SiteController extends Controller
             }
 
             // Charger le fichier Excel
-            require_once ROOT_PATH . '/libs/PhpSpreadsheet/autoload.php';
             $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($filepath);
             $worksheet = $spreadsheet->getActiveSheet();
 
