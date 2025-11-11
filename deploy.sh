@@ -6,6 +6,11 @@
 # - Configure les permissions pour l'utilisateur gestion
 #############################################
 
+# Forcer l'utilisation de bash si le script est appelé avec sh
+if [ -z "$BASH_VERSION" ]; then
+    exec bash "$0" "$@"
+fi
+
 set -e  # Arrêter en cas d'erreur
 
 # Couleurs pour l'affichage
@@ -16,36 +21,36 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APP_DIR="$(cd "$(dirname "$0")" && pwd)"
 USER_OWNER="gestion"
 GROUP_OWNER="gestion"
 LOG_FILE="$APP_DIR/storage/logs/deploy_$(date +%Y%m%d_%H%M%S).log"
 
 # Fonction de log
 log() {
-    echo -e "${GREEN}[$(date '+%Y-%m-%d %H:%M:%S')]${NC} $1" | tee -a "$LOG_FILE"
+    printf "${GREEN}[$(date '+%Y-%m-%d %H:%M:%S')]${NC} %s\n" "$1" | tee -a "$LOG_FILE"
 }
 
 log_error() {
-    echo -e "${RED}[$(date '+%Y-%m-%d %H:%M:%S')] ERREUR:${NC} $1" | tee -a "$LOG_FILE"
+    printf "${RED}[$(date '+%Y-%m-%d %H:%M:%S')] ERREUR:${NC} %s\n" "$1" | tee -a "$LOG_FILE"
 }
 
 log_warning() {
-    echo -e "${YELLOW}[$(date '+%Y-%m-%d %H:%M:%S')] ATTENTION:${NC} $1" | tee -a "$LOG_FILE"
+    printf "${YELLOW}[$(date '+%Y-%m-%d %H:%M:%S')] ATTENTION:${NC} %s\n" "$1" | tee -a "$LOG_FILE"
 }
 
 log_info() {
-    echo -e "${BLUE}[$(date '+%Y-%m-%d %H:%M:%S')] INFO:${NC} $1" | tee -a "$LOG_FILE"
+    printf "${BLUE}[$(date '+%Y-%m-%d %H:%M:%S')] INFO:${NC} %s\n" "$1" | tee -a "$LOG_FILE"
 }
 
 # Vérifier que le script est exécuté en tant que root ou avec sudo
-if [ "$EUID" -ne 0 ]; then
+if [ "$(id -u)" -ne 0 ]; then
     log_error "Ce script doit être exécuté en tant que root (sudo)"
     exit 1
 fi
 
 # Vérifier que l'utilisateur gestion existe
-if ! id "$USER_OWNER" &>/dev/null; then
+if ! id "$USER_OWNER" >/dev/null 2>&1; then
     log_error "L'utilisateur '$USER_OWNER' n'existe pas sur ce système"
     exit 1
 fi
@@ -186,9 +191,9 @@ log_info "Commit: $LAST_COMMIT"
 log_info "Propriétaire: $USER_OWNER:$GROUP_OWNER"
 log_info "Log complet: $LOG_FILE"
 
-echo ""
-echo -e "${GREEN}✓ Déploiement réussi !${NC}"
-echo -e "${BLUE}Pour voir le log complet: cat $LOG_FILE${NC}"
-echo ""
+printf "\n"
+printf "${GREEN}✓ Déploiement réussi !${NC}\n"
+printf "${BLUE}Pour voir le log complet: cat %s${NC}\n" "$LOG_FILE"
+printf "\n"
 
 exit 0
