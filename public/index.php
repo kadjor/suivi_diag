@@ -64,7 +64,7 @@ if ($requestUri === '/deploy/migrations' || strpos($requestUri, '/deploy/migrati
         }
 
         Core\Database::init($dbConfig);
-        $db = Core\Database::getInstance()->getConnection();
+        $db = Core\Database::getConnection();
 
         if (!$db) {
             header('Content-Type: application/json; charset=utf-8', true);
