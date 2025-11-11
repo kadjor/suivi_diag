@@ -49,12 +49,30 @@ if ($requestUri === '/deploy/migrations' || strpos($requestUri, '/deploy/migrati
 
     // Initialiser la base de données
     try {
-        $dbConfig = require CONFIG_PATH . '/database.php';
+        // Vérifier que le fichier de config existe
+        $dbConfigFile = CONFIG_PATH . '/database.php';
+        if (!file_exists($dbConfigFile)) {
+            header('Content-Type: application/json; charset=utf-8', true);
+            die(json_encode(['error' => 'Fichier database.php manquant. Copiez database.php.example vers database.php', 'migrations' => [], 'success' => false]));
+        }
+
+        $dbConfig = @require $dbConfigFile;
+
+        if (!$dbConfig || !is_array($dbConfig)) {
+            header('Content-Type: application/json; charset=utf-8', true);
+            die(json_encode(['error' => 'Configuration database.php invalide', 'migrations' => [], 'success' => false]));
+        }
+
         Core\Database::init($dbConfig);
         $db = Core\Database::getInstance()->getConnection();
-    } catch (Exception $e) {
+
+        if (!$db) {
+            header('Content-Type: application/json; charset=utf-8', true);
+            die(json_encode(['error' => 'Impossible de se connecter à la base de données', 'migrations' => [], 'success' => false]));
+        }
+    } catch (\Throwable $e) {
         header('Content-Type: application/json; charset=utf-8', true);
-        die(json_encode(['error' => 'DB connection failed', 'migrations' => [], 'success' => false]));
+        die(json_encode(['error' => 'Erreur DB: ' . $e->getMessage(), 'migrations' => [], 'success' => false]));
     }
 
     // Traiter les migrations
@@ -91,8 +109,8 @@ if ($requestUri === '/deploy/migrations' || strpos($requestUri, '/deploy/migrati
                         $stmt->close();
                     }
                 }
-            } catch (Exception $e) {
-                // Ignorer
+            } catch (\Throwable $e) {
+                // Ignorer silencieusement
             }
 
             $migrations[] = [
@@ -106,12 +124,12 @@ if ($requestUri === '/deploy/migrations' || strpos($requestUri, '/deploy/migrati
         header('Content-Type: application/json; charset=utf-8', true);
         die(json_encode(['migrations' => $migrations, 'success' => true]));
 
-    } catch (Exception $e) {
+    } catch (\Throwable $e) {
         while (@ob_get_level() > 0) {
             @ob_end_clean();
         }
         header('Content-Type: application/json; charset=utf-8', true);
-        die(json_encode(['error' => $e->getMessage(), 'migrations' => [], 'success' => false]));
+        die(json_encode(['error' => 'Erreur migrations: ' . $e->getMessage(), 'migrations' => [], 'success' => false]));
     }
 }
 
