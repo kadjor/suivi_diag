@@ -382,13 +382,16 @@ class SiteController extends Controller
      */
     public function processExcelImport()
     {
-        if (!Auth::can('manage_sites')) {
-            View::json(['error' => 'Accès refusé'], 403);
-            return;
-        }
-
+        // Nettoyer tous les output buffers et démarrer proprement
         while (ob_get_level()) {
             ob_end_clean();
+        }
+        ob_start();
+
+        if (!Auth::can('manage_sites')) {
+            ob_end_clean();
+            View::json(['error' => 'Accès refusé'], 403);
+            return;
         }
 
         try {
@@ -465,17 +468,17 @@ class SiteController extends Controller
                     );
 
                     if ($existingSite) {
-                        // Mise à jour : ne pas écraser le name existant
+                        // Mise à jour : ne pas écraser le name existant si non fourni
+                        if (empty($siteData['name'])) {
+                            unset($siteData['name']);
+                        }
                         $this->siteModel->update($existingSite['id'], $siteData);
                         $results['warnings'][] = "Ligne $rowNumber: Site mis à jour (groupe: {$siteData['numero_groupe']}, lot: {$siteData['numero_lot']})";
                     } else {
-                        // Création : générer automatiquement le champ 'name' obligatoire
+                        // Création : le champ name est optionnel (peut être NULL)
+                        // Ne pas ajouter le champ name s'il est vide
                         if (empty($siteData['name'])) {
-                            $siteData['name'] = trim(
-                                ($siteData['nommage_rapport'] ?? '') . ' - ' .
-                                ($siteData['address'] ?? '') . ' - Lot ' .
-                                ($siteData['numero_lot'] ?? '')
-                            );
+                            unset($siteData['name']);
                         }
                         $this->siteModel->create($siteData);
                     }
@@ -500,6 +503,8 @@ class SiteController extends Controller
             // Supprimer le fichier temporaire
             @unlink($filepath);
 
+            // Nettoyer le buffer avant d'envoyer le JSON
+            ob_end_clean();
             View::json([
                 'success' => true,
                 'results' => $results,
@@ -507,10 +512,104 @@ class SiteController extends Controller
             ]);
 
         } catch (\Exception $e) {
+            // Nettoyer le buffer en cas d'erreur
+            ob_end_clean();
             View::json([
                 'success' => false,
                 'error' => $e->getMessage()
             ], 400);
+        }
+    }
+
+    /**
+     * Récupérer les sites d'un client (API)
+     */
+    public function getSitesByClientId($clientId)
+    {
+        if (!Auth::can('manage_sites')) {
+            View::json(['error' => 'Accès refusé'], 403);
+            return;
+        }
+
+        try {
+            $sites = $this->siteModel->where(['client_id' => $clientId], 'name ASC');
+            View::json(['success' => true, 'sites' => $sites]);
+        } catch (\Exception $e) {
+            View::json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Supprimer plusieurs sites (bulk delete)
+     */
+    public function deleteBulk()
+    {
+        if (!Auth::can('manage_sites')) {
+            View::json(['error' => 'Accès refusé'], 403);
+            return;
+        }
+
+        try {
+            $siteIds = $_POST['site_ids'] ?? [];
+
+            if (empty($siteIds) || !is_array($siteIds)) {
+                throw new \Exception('Aucun site sélectionné');
+            }
+
+            $deleted = 0;
+            foreach ($siteIds as $siteId) {
+                if ($this->siteModel->delete($siteId)) {
+                    $deleted++;
+                }
+            }
+
+            View::json([
+                'success' => true,
+                'message' => "$deleted site(s) supprimé(s) avec succès",
+                'deleted' => $deleted
+            ]);
+        } catch (\Exception $e) {
+            View::json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Supprimer tous les sites d'un client
+     */
+    public function deleteByClient()
+    {
+        if (!Auth::can('manage_sites')) {
+            View::json(['error' => 'Accès refusé'], 403);
+            return;
+        }
+
+        try {
+            $clientId = $_POST['client_id'] ?? null;
+
+            if (!$clientId) {
+                throw new \Exception('Client non spécifié');
+            }
+
+            // Récupérer tous les sites du client
+            $sites = $this->siteModel->where(['client_id' => $clientId]);
+            $count = count($sites);
+
+            // Supprimer tous les sites
+            $deleted = 0;
+            foreach ($sites as $site) {
+                if ($this->siteModel->delete($site['id'])) {
+                    $deleted++;
+                }
+            }
+
+            View::json([
+                'success' => true,
+                'message' => "$deleted site(s) supprimé(s) pour ce client",
+                'deleted' => $deleted,
+                'total' => $count
+            ]);
+        } catch (\Exception $e) {
+            View::json(['success' => false, 'error' => $e->getMessage()], 500);
         }
     }
 }

@@ -342,6 +342,7 @@ function showMappingStep(data, clientId) {
 
     // Générer le mappage
     const fields = [
+        { name: 'name', label: 'Nom du site', required: false, description: 'Nom descriptif du site (optionnel, laissé vide si non fourni)' },
         { name: 'numero_groupe', label: 'Numéro de groupe', required: true, description: 'Identifiant unique du groupe de lots' },
         { name: 'numero_lot', label: 'Numéro de lot', required: true, description: 'Numéro du lot dans le groupe' },
         { name: 'nom_groupe', label: 'Nom du groupe', required: false, description: 'Nom descriptif du groupe (optionnel)' },

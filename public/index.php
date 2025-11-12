@@ -315,6 +315,9 @@ $router->post('/sites/{id}/update', 'Controllers\SiteController@update');
 $router->get('/api/sites/search-clients', 'Controllers\SiteController@searchClients');
 $router->get('/api/sites/search', 'Controllers\SiteController@searchSites');
 $router->get('/api/sites/search-lot', 'Controllers\SiteController@searchLot');
+$router->get('/api/sites/by-client/{clientId}', 'Controllers\SiteController@getSitesByClientId');
+$router->post('/sites/delete-bulk', 'Controllers\SiteController@deleteBulk');
+$router->post('/sites/delete-by-client', 'Controllers\SiteController@deleteByClient');
 
 // Routes protégées - Clients
 $router->get('/clients', 'Controllers\ClientController@index');
