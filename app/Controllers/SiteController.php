@@ -465,9 +465,18 @@ class SiteController extends Controller
                     );
 
                     if ($existingSite) {
+                        // Mise à jour : ne pas écraser le name existant
                         $this->siteModel->update($existingSite['id'], $siteData);
                         $results['warnings'][] = "Ligne $rowNumber: Site mis à jour (groupe: {$siteData['numero_groupe']}, lot: {$siteData['numero_lot']})";
                     } else {
+                        // Création : générer automatiquement le champ 'name' obligatoire
+                        if (empty($siteData['name'])) {
+                            $siteData['name'] = trim(
+                                ($siteData['nommage_rapport'] ?? '') . ' - ' .
+                                ($siteData['address'] ?? '') . ' - Lot ' .
+                                ($siteData['numero_lot'] ?? '')
+                            );
+                        }
                         $this->siteModel->create($siteData);
                     }
 
