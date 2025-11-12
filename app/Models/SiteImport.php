@@ -8,6 +8,10 @@ class SiteImport extends Model
 {
     protected $table = 'site_imports';
 
+    // Désactiver les timestamps automatiques (created_at/updated_at)
+    // car la table site_imports n'a pas ces colonnes dans le schema officiel
+    protected $timestamps = false;
+
     /**
      * Crée un nouvel import
      */
