@@ -1020,8 +1020,8 @@ class DeployController extends Controller
                 return false;
             }
 
-            // Vérifier si cette migration a été exécutée
-            $stmt = @$db->prepare("SELECT id FROM migrations WHERE migration = ? LIMIT 1");
+            // Vérifier si cette migration a été exécutée (utilise 'filename' conforme au schema.sql)
+            $stmt = @$db->prepare("SELECT id FROM migrations WHERE filename = ? LIMIT 1");
             if (!$stmt) {
                 return false;
             }
@@ -1053,8 +1053,8 @@ class DeployController extends Controller
                 return false;
             }
 
-            // Vérifier si cette migration a été exécutée
-            $stmt = $db->prepare("SELECT id FROM migrations WHERE migration = ? LIMIT 1");
+            // Vérifier si cette migration a été exécutée (utilise 'filename' conforme au schema.sql)
+            $stmt = $db->prepare("SELECT id FROM migrations WHERE filename = ? LIMIT 1");
             $stmt->bind_param('s', $migrationName);
             $stmt->execute();
             $result = $stmt->get_result();
@@ -1079,8 +1079,8 @@ class DeployController extends Controller
             $tableExists = $result && $result->num_rows > 0;
 
             if ($tableExists) {
-                // Vérifier si la colonne 'migration' existe
-                $columnsResult = $db->query("SHOW COLUMNS FROM migrations LIKE 'migration'");
+                // Vérifier si la colonne 'filename' existe (conforme au schema.sql)
+                $columnsResult = $db->query("SHOW COLUMNS FROM migrations LIKE 'filename'");
                 $hasCorrectSchema = $columnsResult && $columnsResult->num_rows > 0;
 
                 if (!$hasCorrectSchema) {
@@ -1092,17 +1092,16 @@ class DeployController extends Controller
             }
 
             if (!$tableExists) {
-                // Créer la table avec le bon schéma
+                // Créer la table avec le bon schéma (conforme au schema.sql)
                 $sql = "CREATE TABLE `migrations` (
-                    `id` int(11) NOT NULL AUTO_INCREMENT,
-                    `migration` varchar(255) NOT NULL,
-                    `executed_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-                    PRIMARY KEY (`id`),
-                    UNIQUE KEY `migration` (`migration`)
+                    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                    `version` INT NOT NULL UNIQUE,
+                    `filename` VARCHAR(255) NOT NULL,
+                    `executed_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
 
                 $db->query($sql);
-                $this->log('✓ Table migrations créée avec le bon schéma');
+                $this->log('✓ Table migrations créée avec le bon schéma (conforme schema.sql)');
             } else {
                 $this->log('✓ Table migrations existe déjà avec le bon schéma');
             }
@@ -1200,8 +1199,12 @@ class DeployController extends Controller
                     }
 
                     // Enregistrer la migration comme exécutée
-                    $stmt = $db->prepare("INSERT INTO migrations (migration) VALUES (?)");
-                    $stmt->bind_param('s', $migrationName);
+                    // Extraire le numéro de version du nom de fichier (ex: 001, 002, etc.)
+                    preg_match('/^(\d+)/', $migrationName, $matches);
+                    $version = isset($matches[1]) ? (int)$matches[1] : 0;
+
+                    $stmt = $db->prepare("INSERT INTO migrations (version, filename) VALUES (?, ?)");
+                    $stmt->bind_param('is', $version, $migrationName);
                     $stmt->execute();
 
                     $results['executed'][] = $migrationName;
