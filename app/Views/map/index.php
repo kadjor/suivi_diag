@@ -19,7 +19,7 @@
         <div id="address-results" class="address-results"></div>
     </div>
     <div class="search-info">
-        <span id="sites-count"><?= count($sites) ?></span> sites localisés
+        <span id="sites-count"><?= count($sites) ?></span> sites disponibles - 🔍 Recherchez une adresse pour afficher les sites à proximité
     </div>
 </div>
 
@@ -36,12 +36,19 @@
 <div class="map-legend">
     <h4>Légende</h4>
     <div class="legend-item">
+        <span class="marker-icon" style="background: #e74c3c;">📌</span>
+        <span>Adresse recherchée</span>
+    </div>
+    <div class="legend-item">
         <span class="marker-icon" style="background: #3498db;">📍</span>
         <span>Sites avec commandes</span>
     </div>
     <div class="legend-item">
         <span class="marker-icon" style="background: #95a5a6;">📍</span>
         <span>Sites sans commande</span>
+    </div>
+    <div style="margin-top: 10px; font-size: 12px; color: #7f8c8d;">
+        Rayon de recherche: 10 km
     </div>
 </div>
 
@@ -284,6 +291,7 @@
 <script>
 const sites = <?= json_encode($sites) ?>;
 const userRole = '<?= $user_role ?>';
+let activeMarkers = [];
 
 // Initialiser la carte
 const map = L.map('map').setView([46.603354, 1.888334], 6); // Centre de la France
@@ -293,28 +301,60 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19
 }).addTo(map);
 
-// Ajouter les markers pour chaque site
-sites.forEach(site => {
-    const markerColor = site.orders_count > 0 ? '#3498db' : '#95a5a6';
-    
-    const marker = L.marker([site.latitude, site.longitude], {
-        icon: L.divIcon({
-            className: 'custom-marker',
-            html: `<div style="background: ${markerColor}; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 16px; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">📍</div>`,
-            iconSize: [30, 30]
-        })
-    }).addTo(map);
+console.log(`📍 Carte prête. ${sites.length} sites disponibles. Utilisez la recherche d'adresse pour afficher les sites à proximité.`);
 
-    marker.bindPopup(`
-        <div style="min-width: 200px;">
-            <h4 style="margin: 0 0 10px 0;">${site.name}</h4>
-            <p style="margin: 5px 0;"><strong>Client:</strong> ${site.client_name}</p>
-            <p style="margin: 5px 0;"><strong>Adresse:</strong> ${site.address}, ${site.postal_code} ${site.city}</p>
-            <p style="margin: 5px 0;"><strong>Commandes:</strong> ${site.orders_count}</p>
-            <a href="/sites/${site.id}" style="display: inline-block; margin-top: 10px; padding: 5px 10px; background: #3498db; color: white; text-decoration: none; border-radius: 4px;">Voir le site</a>
-        </div>
-    `);
-});
+// Fonction pour afficher les sites dans un rayon autour d'un point
+function showSitesNearLocation(centerLat, centerLng, radiusKm = 10) {
+    // Effacer les anciens marqueurs de sites
+    activeMarkers.forEach(m => map.removeLayer(m));
+    activeMarkers = [];
+
+    // Filtrer les sites dans le rayon
+    let displayedCount = 0;
+    sites.forEach(site => {
+        const distance = calculateDistance(centerLat, centerLng, site.latitude, site.longitude);
+
+        if (distance <= radiusKm) {
+            displayedCount++;
+            const markerColor = site.orders_count > 0 ? '#3498db' : '#95a5a6';
+
+            const marker = L.marker([site.latitude, site.longitude], {
+                icon: L.divIcon({
+                    className: 'custom-marker',
+                    html: `<div style="background: ${markerColor}; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 16px; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">📍</div>`,
+                    iconSize: [30, 30]
+                })
+            }).addTo(map);
+
+            marker.bindPopup(`
+                <div style="min-width: 200px;">
+                    <h4 style="margin: 0 0 10px 0;">${site.name || 'Site'}</h4>
+                    <p style="margin: 5px 0;"><strong>Client:</strong> ${site.client_name}</p>
+                    <p style="margin: 5px 0;"><strong>Adresse:</strong> ${site.address}, ${site.postal_code} ${site.city}</p>
+                    <p style="margin: 5px 0;"><strong>Commandes:</strong> ${site.orders_count}</p>
+                    <p style="margin: 5px 0; color: #7f8c8d;"><strong>Distance:</strong> ${distance.toFixed(2)} km</p>
+                    <a href="/sites/${site.id}" style="display: inline-block; margin-top: 10px; padding: 5px 10px; background: #3498db; color: white; text-decoration: none; border-radius: 4px;">Voir le site</a>
+                </div>
+            `);
+
+            activeMarkers.push(marker);
+        }
+    });
+
+    console.log(`✅ ${displayedCount} site(s) affiché(s) dans un rayon de ${radiusKm} km`);
+}
+
+// Fonction pour calculer la distance entre deux points (formule Haversine)
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Rayon de la Terre en km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+}
 
 // Autocomplétion adresse
 let searchTimeout;
@@ -364,6 +404,9 @@ addressSearch.addEventListener('input', function() {
                                 iconSize: [40, 40]
                             })
                         }).addTo(map).bindPopup(`<strong>${label}</strong>`).openPopup();
+
+                        // Afficher les sites dans un rayon de 10 km
+                        showSitesNearLocation(lat, lng, 10);
 
                         // Charger les commandes à proximité
                         loadNearbyOrders(lat, lng);
