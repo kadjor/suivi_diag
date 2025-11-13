@@ -6,8 +6,13 @@ $is_client = ($user['role_name'] === 'client');
 <div class="patrimoine-map-page">
     <div class="map-header">
         <h1>🗺️ Carte du Patrimoine</h1>
-        <div class="map-controls">
-            <button onclick="resetMap()" class="btn btn-secondary">🔄 Réinitialiser</button>
+        <div class="map-search-bar">
+            <input type="text"
+                   id="mapSearchInput"
+                   placeholder="🔍 Rechercher un groupe, une adresse, une ville..."
+                   class="map-search-input">
+            <button onclick="searchOnMap()" class="btn btn-primary">Rechercher</button>
+            <button onclick="clearMap()" class="btn btn-secondary">🔄 Effacer</button>
         </div>
     </div>
 
@@ -16,7 +21,7 @@ $is_client = ($user['role_name'] === 'client');
         <div class="map-sidebar" id="sidebar">
             <div class="sidebar-header">
                 <h2>Navigation</h2>
-                <input type="text" id="searchInput" placeholder="🔍 Rechercher un site, ville, groupe..." class="search-input">
+                <p style="color: #7f8c8d; font-size: 13px; margin-top: 10px;">Utilisez la barre de recherche ci-dessus pour afficher les groupes</p>
             </div>
 
             <div class="sidebar-content">
@@ -114,16 +119,35 @@ $is_client = ($user['role_name'] === 'client');
     background: white;
     padding: 15px 20px;
     border-bottom: 2px solid #e0e0e0;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .map-header h1 {
-    margin: 0;
+    margin: 0 0 15px 0;
     font-size: 24px;
     color: #2c3e50;
+}
+
+.map-search-bar {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    max-width: 800px;
+}
+
+.map-search-input {
+    flex: 1;
+    padding: 12px 20px;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 15px;
+    transition: border-color 0.3s;
+}
+
+.map-search-input:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
 }
 
 .map-controls {
@@ -407,11 +431,12 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 }).addTo(map);
 
 // Structures de données
-let groupMarkers = {}; // Marqueurs de groupes (niveau 1)
-let siteMarkers = {}; // Marqueurs de sites individuels (niveau 2)
+let activeMarkers = [];
+let siteMarkers = {}; // Marqueurs de sites individuels
 let cityGroups = {};
 let currentLevel = 'groups'; // 'groups' ou 'sites'
 let currentGroup = null;
+let searchCircle = null;
 
 // Icônes personnalisées
 const createCustomIcon = (color, icon, size = 40) => {
@@ -436,75 +461,111 @@ sites.forEach(site => {
     groupedSites[groupKey].sites.push(site);
 });
 
-// Créer UN SEUL marqueur par groupe (au centre géographique du groupe)
-Object.keys(groupedSites).forEach(groupNum => {
-    const groupData = groupedSites[groupNum];
-    const groupSites = groupData.sites.filter(s => s.latitude && s.longitude);
+console.log(`📍 Carte du patrimoine prête. ${sites.length} sites disponibles dans ${Object.keys(groupedSites).length} groupes.`);
 
-    if (groupSites.length === 0) return;
+// Fonction de recherche
+function searchOnMap() {
+    const searchTerm = document.getElementById('mapSearchInput').value.trim().toLowerCase();
 
-    // Calculer le centre du groupe
-    const avgLat = groupSites.reduce((sum, s) => sum + parseFloat(s.latitude), 0) / groupSites.length;
-    const avgLng = groupSites.reduce((sum, s) => sum + parseFloat(s.longitude), 0) / groupSites.length;
+    if (!searchTerm) {
+        alert('Veuillez entrer un groupe, une adresse ou une ville');
+        return;
+    }
 
-    // Créer le marqueur du groupe
-    const groupMarker = L.marker([avgLat, avgLng], {
-        icon: createCustomIcon('#e74c3c', '📦', 50)
-    });
+    // Effacer les anciens marqueurs
+    clearMap();
 
-    groupMarker.groupData = {
-        numero: groupNum,
-        name: groupData.name,
-        sites: groupSites,
-        count: groupSites.length
-    };
+    // Chercher les groupes correspondants
+    const matchingGroups = {};
+    Object.keys(groupedSites).forEach(groupNum => {
+        const groupData = groupedSites[groupNum];
+        const groupSites = groupData.sites;
 
-    // Tooltip
-    groupMarker.bindTooltip(`
-        <strong>📦 Groupe ${groupNum}</strong><br>
-        ${groupData.name !== groupNum ? groupData.name + '<br>' : ''}
-        <strong>${groupSites.length} lot(s)</strong>
-    `, {
-        permanent: false,
-        direction: 'top'
-    });
+        // Vérifier si le groupe correspond à la recherche
+        const groupMatches =
+            groupNum.toLowerCase().includes(searchTerm) ||
+            groupData.name.toLowerCase().includes(searchTerm);
 
-    // Clic sur le groupe = zoomer et afficher les sites du groupe
-    groupMarker.on('click', () => {
-        zoomToGroup(groupNum, groupSites);
-    });
+        // Vérifier si un site du groupe correspond
+        const siteMatches = groupSites.some(site => {
+            return (
+                (site.address && site.address.toLowerCase().includes(searchTerm)) ||
+                (site.city && site.city.toLowerCase().includes(searchTerm)) ||
+                (site.numero_lot && site.numero_lot.toLowerCase().includes(searchTerm))
+            );
+        });
 
-    groupMarkers[groupNum] = groupMarker;
-    groupMarker.addTo(map);
-
-    // Grouper par ville
-    groupSites.forEach(site => {
-        const cityKey = site.city || 'Non défini';
-        if (!cityGroups[cityKey]) {
-            cityGroups[cityKey] = [];
-        }
-        if (!cityGroups[cityKey].includes(groupNum)) {
-            cityGroups[cityKey].push(groupNum);
+        if (groupMatches || siteMatches) {
+            matchingGroups[groupNum] = groupData;
         }
     });
-});
 
-// Ajuster la vue initiale pour voir tous les groupes
-const allGroupMarkers = Object.values(groupMarkers);
-if (allGroupMarkers.length > 0) {
-    const group = L.featureGroup(allGroupMarkers);
-    map.fitBounds(group.getBounds().pad(0.1));
+    if (Object.keys(matchingGroups).length === 0) {
+        alert('Aucun groupe trouvé pour cette recherche');
+        return;
+    }
+
+    // Afficher les groupes trouvés
+    let allMatchingSites = [];
+    Object.keys(matchingGroups).forEach(groupNum => {
+        const groupData = matchingGroups[groupNum];
+        const groupSites = groupData.sites.filter(s => s.latitude && s.longitude);
+
+        if (groupSites.length === 0) return;
+        allMatchingSites = allMatchingSites.concat(groupSites);
+
+        // Calculer le centre du groupe
+        const avgLat = groupSites.reduce((sum, s) => sum + parseFloat(s.latitude), 0) / groupSites.length;
+        const avgLng = groupSites.reduce((sum, s) => sum + parseFloat(s.longitude), 0) / groupSites.length;
+
+        // Créer le marqueur du groupe
+        const groupMarker = L.marker([avgLat, avgLng], {
+            icon: createCustomIcon('#e74c3c', '📦', 50)
+        });
+
+        groupMarker.groupData = {
+            numero: groupNum,
+            name: groupData.name,
+            sites: groupSites,
+            count: groupSites.length
+        };
+
+        // Tooltip
+        groupMarker.bindTooltip(`
+            <strong>📦 Groupe ${groupNum}</strong><br>
+            ${groupData.name !== groupNum ? groupData.name + '<br>' : ''}
+            <strong>${groupSites.length} lot(s)</strong>
+        `, {
+            permanent: false,
+            direction: 'top'
+        });
+
+        // Clic sur le groupe = zoomer et afficher les sites du groupe
+        groupMarker.on('click', () => {
+            zoomToGroup(groupNum, groupSites);
+        });
+
+        groupMarker.addTo(map);
+        activeMarkers.push(groupMarker);
+    });
+
+    // Zoomer sur les résultats
+    if (activeMarkers.length > 0) {
+        const group = L.featureGroup(activeMarkers);
+        map.fitBounds(group.getBounds().pad(0.15));
+    }
+
+    console.log(`✅ ${Object.keys(matchingGroups).length} groupe(s) trouvé(s) pour "${searchTerm}"`);
 }
-
-console.log(`✅ Carte optimisée: ${Object.keys(groupMarkers).length} groupes au lieu de ${sites.length} sites`);
 
 // Fonction pour zoomer sur un groupe et afficher ses bâtiments
 function zoomToGroup(groupNum, groupSites) {
     currentLevel = 'sites';
     currentGroup = groupNum;
 
-    // Masquer tous les marqueurs de groupes
-    Object.values(groupMarkers).forEach(m => map.removeLayer(m));
+    // Masquer tous les marqueurs de groupes actifs
+    activeMarkers.forEach(m => map.removeLayer(m));
+    activeMarkers = [];
 
     // Créer et afficher les marqueurs de sites pour ce groupe
     groupSites.forEach(site => {
@@ -526,93 +587,39 @@ function zoomToGroup(groupNum, groupSites) {
             showBuildingInfo(site);
         });
 
-        if (!siteMarkers[groupNum]) {
-            siteMarkers[groupNum] = [];
-        }
-        siteMarkers[groupNum].push(siteMarker);
         siteMarker.addTo(map);
+        activeMarkers.push(siteMarker);
     });
 
     // Zoomer sur les sites
-    const siteMks = siteMarkers[groupNum];
-    if (siteMks && siteMks.length > 0) {
-        const group = L.featureGroup(siteMks);
+    if (activeMarkers.length > 0) {
+        const group = L.featureGroup(activeMarkers);
         map.fitBounds(group.getBounds().pad(0.15));
     }
 
     // Afficher infos du groupe dans le panneau
     showGroupInfo(groupNum, groupSites);
-
-    // Changer le bouton de réinitialisation
-    document.querySelector('.map-controls').innerHTML = `
-        <button onclick="backToGroups()" class="btn btn-secondary">← Retour aux groupes</button>
-        <button onclick="resetMap()" class="btn btn-secondary">🔄 Réinitialiser</button>
-    `;
 }
 
-// Retour à la vue des groupes
-function backToGroups() {
-    currentLevel = 'groups';
-    currentGroup = null;
+// Effacer la carte
+function clearMap() {
+    // Supprimer tous les marqueurs actifs
+    activeMarkers.forEach(m => map.removeLayer(m));
+    activeMarkers = [];
 
-    // Supprimer tous les marqueurs de sites
-    Object.values(siteMarkers).forEach(markers => {
-        markers.forEach(m => map.removeLayer(m));
-    });
-    siteMarkers = {};
-
-    // Réafficher les marqueurs de groupes
-    Object.values(groupMarkers).forEach(m => m.addTo(map));
-
-    // Réajuster la vue
-    const allGroupMarkers = Object.values(groupMarkers);
-    if (allGroupMarkers.length > 0) {
-        const group = L.featureGroup(allGroupMarkers);
-        map.fitBounds(group.getBounds().pad(0.1));
+    // Supprimer le cercle de recherche
+    if (searchCircle) {
+        map.removeLayer(searchCircle);
+        searchCircle = null;
     }
 
     closeInfoPanel();
 
-    // Restaurer les boutons d'origine
-    document.querySelector('.map-controls').innerHTML = `
-        <button onclick="resetMap()" class="btn btn-secondary">🔄 Réinitialiser</button>
-    `;
-}
+    // Retour à la vue France
+    map.setView([48.8566, 2.3522], 6);
 
-// Focus sur une ville
-function focusOnCity(cityName) {
-    const cityGroupNums = cityGroups[cityName] || [];
-    if (cityGroupNums.length === 0) return;
-
-    const cityGroupMarkers = cityGroupNums.map(g => groupMarkers[g]).filter(m => m);
-    if (cityGroupMarkers.length === 0) return;
-
-    const group = L.featureGroup(cityGroupMarkers);
-    map.fitBounds(group.getBounds().pad(0.2));
-
-    // Highlight temporairement
-    cityGroupMarkers.forEach(m => {
-        const originalIcon = m.getIcon();
-        m.setIcon(createCustomIcon('#9b59b6', '🏙️', 50));
-        setTimeout(() => {
-            m.setIcon(createCustomIcon('#e74c3c', '📦', 50));
-        }, 2000);
-    });
-}
-
-// Focus sur un groupe depuis le sidebar
-function focusOnGroup(groupNum) {
-    const groupMarker = groupMarkers[groupNum];
-    if (!groupMarker) return;
-
-    // Zoomer sur le marqueur du groupe
-    map.setView(groupMarker.getLatLng(), 13);
-
-    // Highlight
-    groupMarker.setIcon(createCustomIcon('#f39c12', '📦', 50));
-    setTimeout(() => {
-        groupMarker.setIcon(createCustomIcon('#e74c3c', '📦', 50));
-    }, 2000);
+    currentLevel = 'groups';
+    currentGroup = null;
 }
 
 // Afficher infos d'un bâtiment
@@ -702,21 +709,7 @@ function closeInfoPanel() {
     document.getElementById('infoPanel').style.display = 'none';
 }
 
-// Réinitialiser la carte
-function resetMap() {
-    if (currentLevel === 'sites') {
-        backToGroups();
-    } else {
-        const allGroupMarkers = Object.values(groupMarkers);
-        if (allGroupMarkers.length > 0) {
-            const group = L.featureGroup(allGroupMarkers);
-            map.fitBounds(group.getBounds().pad(0.1));
-        }
-        closeInfoPanel();
-    }
-}
-
-// Toggle sections
+// Toggle sections (pour le sidebar)
 function toggleSection(sectionId) {
     const list = document.getElementById(sectionId + '-list');
     const icon = document.getElementById(sectionId + '-icon');
@@ -730,26 +723,10 @@ function toggleSection(sectionId) {
     }
 }
 
-// Recherche
-document.getElementById('searchInput').addEventListener('input', function(e) {
-    const searchTerm = e.target.value.toLowerCase().trim();
-
-    if (!searchTerm) {
-        // Réafficher tous
-        document.querySelectorAll('.nav-item').forEach(item => {
-            item.style.display = 'flex';
-        });
-        return;
+// Recherche avec Entrée
+document.getElementById('mapSearchInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        searchOnMap();
     }
-
-    // Filtrer
-    document.querySelectorAll('.nav-item').forEach(item => {
-        const text = item.textContent.toLowerCase();
-        if (text.includes(searchTerm)) {
-            item.style.display = 'flex';
-        } else {
-            item.style.display = 'none';
-        }
-    });
 });
 </script>
