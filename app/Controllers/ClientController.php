@@ -186,8 +186,20 @@ class ClientController extends Controller
             'city' => $_POST['city'] ?? '',
             'postal_code' => $_POST['postal_code'] ?? '',
             'siret' => $_POST['siret'] ?? '',
-            'notes' => $_POST['notes'] ?? ''
+            'notes' => $_POST['notes'] ?? '',
+            'active' => isset($_POST['active']) ? 1 : 0
         ];
+
+        // Validation
+        $validator = new Validator($data);
+        $validator->required(['organization_name', 'contact_name', 'email', 'address', 'city', 'postal_code']);
+        $validator->email('email');
+
+        if (!$validator->validate()) {
+            Session::flash('error', implode(', ', $validator->getErrors()));
+            View::redirect('/clients/' . $id . '/edit');
+            return;
+        }
 
         try {
             $this->clientModel->update($id, $data);

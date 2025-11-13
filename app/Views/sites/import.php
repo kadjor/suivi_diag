@@ -349,6 +349,8 @@ function showMappingStep(data, clientId) {
         { name: 'address', label: 'Adresse', required: true, description: 'Adresse complète du site' },
         { name: 'city', label: 'Ville', required: true, description: 'Ville où se trouve le site' },
         { name: 'postal_code', label: 'Code postal', required: true, description: 'Code postal (5 chiffres)' },
+        { name: 'latitude', label: 'Latitude', required: false, description: 'Coordonnée GPS latitude (décimal, ex: 48.8566)' },
+        { name: 'longitude', label: 'Longitude', required: false, description: 'Coordonnée GPS longitude (décimal, ex: 2.3522)' },
         { name: 'numero_porte', label: 'Numéro de porte', required: false, description: 'Numéro de porte ou d\'appartement' },
         { name: 'niveau', label: 'Niveau', required: false, description: 'Étage ou niveau du lot' },
         { name: 'identifiant_fiscal', label: 'Identifiant fiscal', required: false, description: 'Référence cadastrale ou fiscale' },
