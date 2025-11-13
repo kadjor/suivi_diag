@@ -8,9 +8,6 @@ $is_client = ($user['role_name'] === 'client');
         <h1>🗺️ Carte du Patrimoine</h1>
         <div class="map-controls">
             <button onclick="resetMap()" class="btn btn-secondary">🔄 Réinitialiser</button>
-            <button onclick="toggleClustering()" class="btn btn-secondary" id="clusterBtn">
-                📍 Regrouper
-            </button>
         </div>
     </div>
 
@@ -392,12 +389,9 @@ $is_client = ($user['role_name'] === 'client');
 
 <!-- Leaflet CSS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
-<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
 
 <!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 
 <script>
 // Données des sites
@@ -412,127 +406,213 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19
 }).addTo(map);
 
-// Groupes de marqueurs
-let markerClusterGroup = L.markerClusterGroup({
-    chunkedLoading: true,
-    spiderfyOnMaxZoom: true,
-    showCoverageOnHover: false,
-    zoomToBoundsOnClick: true
-});
-
-let markers = [];
-let groupMarkers = {};
-let cityMarkers = {};
+// Structures de données
+let groupMarkers = {}; // Marqueurs de groupes (niveau 1)
+let siteMarkers = {}; // Marqueurs de sites individuels (niveau 2)
+let cityGroups = {};
+let currentLevel = 'groups'; // 'groups' ou 'sites'
+let currentGroup = null;
 
 // Icônes personnalisées
-const createCustomIcon = (color, icon) => {
+const createCustomIcon = (color, icon, size = 40) => {
     return L.divIcon({
         className: 'custom-marker',
-        html: `<div style="background-color: ${color}; width: 35px; height: 35px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 18px; border: 3px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">${icon}</div>`,
-        iconSize: [35, 35],
-        iconAnchor: [17, 35]
+        html: `<div style="background-color: ${color}; width: ${size}px; height: ${size}px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: ${size/2}px; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.4); font-weight: bold;">${icon}</div>`,
+        iconSize: [size, size],
+        iconAnchor: [size/2, size]
     });
 };
 
-// Créer les marqueurs pour chaque site
+// Grouper les sites par numéro de groupe
+const groupedSites = {};
 sites.forEach(site => {
-    if (!site.latitude || !site.longitude) return;
-
-    const marker = L.marker([site.latitude, site.longitude], {
-        icon: createCustomIcon('#3498db', '🏢')
-    });
-
-    marker.siteData = site;
-
-    // Popup simple au survol
-    marker.bindTooltip(`
-        <strong>${site.numero_groupe || 'N/A'}</strong><br>
-        ${site.address || 'N/A'}<br>
-        ${site.city || 'N/A'}
-    `);
-
-    // Clic pour afficher détails
-    marker.on('click', () => {
-        showBuildingInfo(site);
-    });
-
-    markers.push(marker);
-    markerClusterGroup.addLayer(marker);
-
-    // Grouper par groupe
     const groupKey = site.numero_groupe || 'Sans groupe';
-    if (!groupMarkers[groupKey]) {
-        groupMarkers[groupKey] = [];
+    if (!groupedSites[groupKey]) {
+        groupedSites[groupKey] = {
+            sites: [],
+            name: site.nom_groupe || groupKey
+        };
     }
-    groupMarkers[groupKey].push(marker);
-
-    // Grouper par ville
-    const cityKey = site.city || 'Non défini';
-    if (!cityMarkers[cityKey]) {
-        cityMarkers[cityKey] = [];
-    }
-    cityMarkers[cityKey].push(marker);
+    groupedSites[groupKey].sites.push(site);
 });
 
-map.addLayer(markerClusterGroup);
+// Créer UN SEUL marqueur par groupe (au centre géographique du groupe)
+Object.keys(groupedSites).forEach(groupNum => {
+    const groupData = groupedSites[groupNum];
+    const groupSites = groupData.sites.filter(s => s.latitude && s.longitude);
 
-// Ajuster la vue pour afficher tous les marqueurs
-if (markers.length > 0) {
-    const group = L.featureGroup(markers);
+    if (groupSites.length === 0) return;
+
+    // Calculer le centre du groupe
+    const avgLat = groupSites.reduce((sum, s) => sum + parseFloat(s.latitude), 0) / groupSites.length;
+    const avgLng = groupSites.reduce((sum, s) => sum + parseFloat(s.longitude), 0) / groupSites.length;
+
+    // Créer le marqueur du groupe
+    const groupMarker = L.marker([avgLat, avgLng], {
+        icon: createCustomIcon('#e74c3c', '📦', 50)
+    });
+
+    groupMarker.groupData = {
+        numero: groupNum,
+        name: groupData.name,
+        sites: groupSites,
+        count: groupSites.length
+    };
+
+    // Tooltip
+    groupMarker.bindTooltip(`
+        <strong>📦 Groupe ${groupNum}</strong><br>
+        ${groupData.name !== groupNum ? groupData.name + '<br>' : ''}
+        <strong>${groupSites.length} lot(s)</strong>
+    `, {
+        permanent: false,
+        direction: 'top'
+    });
+
+    // Clic sur le groupe = zoomer et afficher les sites du groupe
+    groupMarker.on('click', () => {
+        zoomToGroup(groupNum, groupSites);
+    });
+
+    groupMarkers[groupNum] = groupMarker;
+    groupMarker.addTo(map);
+
+    // Grouper par ville
+    groupSites.forEach(site => {
+        const cityKey = site.city || 'Non défini';
+        if (!cityGroups[cityKey]) {
+            cityGroups[cityKey] = [];
+        }
+        if (!cityGroups[cityKey].includes(groupNum)) {
+            cityGroups[cityKey].push(groupNum);
+        }
+    });
+});
+
+// Ajuster la vue initiale pour voir tous les groupes
+const allGroupMarkers = Object.values(groupMarkers);
+if (allGroupMarkers.length > 0) {
+    const group = L.featureGroup(allGroupMarkers);
     map.fitBounds(group.getBounds().pad(0.1));
 }
 
-// Toggle clustering
-let clusteringEnabled = true;
-function toggleClustering() {
-    if (clusteringEnabled) {
-        map.removeLayer(markerClusterGroup);
-        markers.forEach(m => m.addTo(map));
-        document.getElementById('clusterBtn').textContent = '📍 Dégrouper';
-    } else {
-        markers.forEach(m => map.removeLayer(m));
-        map.addLayer(markerClusterGroup);
-        document.getElementById('clusterBtn').textContent = '📍 Regrouper';
+console.log(`✅ Carte optimisée: ${Object.keys(groupMarkers).length} groupes au lieu de ${sites.length} sites`);
+
+// Fonction pour zoomer sur un groupe et afficher ses bâtiments
+function zoomToGroup(groupNum, groupSites) {
+    currentLevel = 'sites';
+    currentGroup = groupNum;
+
+    // Masquer tous les marqueurs de groupes
+    Object.values(groupMarkers).forEach(m => map.removeLayer(m));
+
+    // Créer et afficher les marqueurs de sites pour ce groupe
+    groupSites.forEach(site => {
+        if (!site.latitude || !site.longitude) return;
+
+        const siteMarker = L.marker([site.latitude, site.longitude], {
+            icon: createCustomIcon('#3498db', '🏢', 35)
+        });
+
+        siteMarker.siteData = site;
+
+        siteMarker.bindTooltip(`
+            <strong>Lot ${site.numero_lot || 'N/A'}</strong><br>
+            ${site.address || 'N/A'}<br>
+            ${site.city || 'N/A'}
+        `);
+
+        siteMarker.on('click', () => {
+            showBuildingInfo(site);
+        });
+
+        if (!siteMarkers[groupNum]) {
+            siteMarkers[groupNum] = [];
+        }
+        siteMarkers[groupNum].push(siteMarker);
+        siteMarker.addTo(map);
+    });
+
+    // Zoomer sur les sites
+    const siteMks = siteMarkers[groupNum];
+    if (siteMks && siteMks.length > 0) {
+        const group = L.featureGroup(siteMks);
+        map.fitBounds(group.getBounds().pad(0.15));
     }
-    clusteringEnabled = !clusteringEnabled;
+
+    // Afficher infos du groupe dans le panneau
+    showGroupInfo(groupNum, groupSites);
+
+    // Changer le bouton de réinitialisation
+    document.querySelector('.map-controls').innerHTML = `
+        <button onclick="backToGroups()" class="btn btn-secondary">← Retour aux groupes</button>
+        <button onclick="resetMap()" class="btn btn-secondary">🔄 Réinitialiser</button>
+    `;
+}
+
+// Retour à la vue des groupes
+function backToGroups() {
+    currentLevel = 'groups';
+    currentGroup = null;
+
+    // Supprimer tous les marqueurs de sites
+    Object.values(siteMarkers).forEach(markers => {
+        markers.forEach(m => map.removeLayer(m));
+    });
+    siteMarkers = {};
+
+    // Réafficher les marqueurs de groupes
+    Object.values(groupMarkers).forEach(m => m.addTo(map));
+
+    // Réajuster la vue
+    const allGroupMarkers = Object.values(groupMarkers);
+    if (allGroupMarkers.length > 0) {
+        const group = L.featureGroup(allGroupMarkers);
+        map.fitBounds(group.getBounds().pad(0.1));
+    }
+
+    closeInfoPanel();
+
+    // Restaurer les boutons d'origine
+    document.querySelector('.map-controls').innerHTML = `
+        <button onclick="resetMap()" class="btn btn-secondary">🔄 Réinitialiser</button>
+    `;
 }
 
 // Focus sur une ville
 function focusOnCity(cityName) {
-    const cityMs = cityMarkers[cityName] || [];
-    if (cityMs.length === 0) return;
+    const cityGroupNums = cityGroups[cityName] || [];
+    if (cityGroupNums.length === 0) return;
 
-    const group = L.featureGroup(cityMs);
+    const cityGroupMarkers = cityGroupNums.map(g => groupMarkers[g]).filter(m => m);
+    if (cityGroupMarkers.length === 0) return;
+
+    const group = L.featureGroup(cityGroupMarkers);
     map.fitBounds(group.getBounds().pad(0.2));
 
     // Highlight temporairement
-    cityMs.forEach(m => {
-        m.setIcon(createCustomIcon('#e74c3c', '🏙️'));
+    cityGroupMarkers.forEach(m => {
+        const originalIcon = m.getIcon();
+        m.setIcon(createCustomIcon('#9b59b6', '🏙️', 50));
         setTimeout(() => {
-            m.setIcon(createCustomIcon('#3498db', '🏢'));
+            m.setIcon(createCustomIcon('#e74c3c', '📦', 50));
         }, 2000);
     });
 }
 
-// Focus sur un groupe
+// Focus sur un groupe depuis le sidebar
 function focusOnGroup(groupNum) {
-    const groupMs = groupMarkers[groupNum] || [];
-    if (groupMs.length === 0) return;
+    const groupMarker = groupMarkers[groupNum];
+    if (!groupMarker) return;
 
-    const group = L.featureGroup(groupMs);
-    map.fitBounds(group.getBounds().pad(0.2));
-    map.setZoom(Math.min(map.getZoom(), 16));
+    // Zoomer sur le marqueur du groupe
+    map.setView(groupMarker.getLatLng(), 13);
 
     // Highlight
-    groupMs.forEach(m => {
-        m.setIcon(createCustomIcon('#f39c12', '📦'));
-        setTimeout(() => {
-            m.setIcon(createCustomIcon('#3498db', '🏢'));
-        }, 2000);
-    });
-
-    // Afficher infos du groupe
-    showGroupInfo(groupNum, groupMs);
+    groupMarker.setIcon(createCustomIcon('#f39c12', '📦', 50));
+    setTimeout(() => {
+        groupMarker.setIcon(createCustomIcon('#e74c3c', '📦', 50));
+    }, 2000);
 }
 
 // Afficher infos d'un bâtiment
@@ -588,22 +668,20 @@ function showBuildingInfo(site) {
 }
 
 // Afficher infos d'un groupe
-function showGroupInfo(groupNum, groupMarkers) {
+function showGroupInfo(groupNum, groupSites) {
     const panel = document.getElementById('infoPanel');
     const content = document.getElementById('infoPanelContent');
-
-    const sitesData = groupMarkers.map(m => m.siteData);
 
     content.innerHTML = `
         <div class="building-info">
             <div class="building-header">
                 <h3>📦 Groupe ${groupNum}</h3>
-                <div class="building-address">${sitesData.length} lot(s)</div>
+                <div class="building-address">${groupSites.length} lot(s)</div>
             </div>
 
             <div class="lots-list">
-                ${sitesData.map(site => `
-                    <div class="lot-card" onclick="showBuildingInfo(${JSON.stringify(site).replace(/"/g, '&quot;')})">
+                ${groupSites.map(site => `
+                    <div class="lot-card" onclick='showBuildingInfo(${JSON.stringify(site)})'>
                         <div class="lot-number">Lot ${site.numero_lot || 'N/A'}</div>
                         <div class="lot-details">
                             <div>${site.address || 'N/A'}</div>
@@ -626,11 +704,16 @@ function closeInfoPanel() {
 
 // Réinitialiser la carte
 function resetMap() {
-    if (markers.length > 0) {
-        const group = L.featureGroup(markers);
-        map.fitBounds(group.getBounds().pad(0.1));
+    if (currentLevel === 'sites') {
+        backToGroups();
+    } else {
+        const allGroupMarkers = Object.values(groupMarkers);
+        if (allGroupMarkers.length > 0) {
+            const group = L.featureGroup(allGroupMarkers);
+            map.fitBounds(group.getBounds().pad(0.1));
+        }
+        closeInfoPanel();
     }
-    closeInfoPanel();
 }
 
 // Toggle sections
