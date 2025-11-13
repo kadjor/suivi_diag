@@ -115,17 +115,24 @@ class ClientController extends Controller
             'city' => $_POST['city'] ?? '',
             'postal_code' => $_POST['postal_code'] ?? '',
             'siret' => $_POST['siret'] ?? '',
-            'notes' => $_POST['notes'] ?? ''
+            'notes' => $_POST['notes'] ?? '',
+            'active' => 1
         ];
 
         // Validation
-        $validator = new Validator($data);
-        $validator->required(['organization_name', 'contact_name', 'email']);
-        $validator->email('email');
+        $validator = new Validator($data, [
+            'organization_name' => 'required',
+            'contact_name' => 'required',
+            'email' => 'required|email',
+            'address' => 'required',
+            'city' => 'required',
+            'postal_code' => 'required'
+        ]);
 
-        if (!$validator->validate()) {
-            Session::flash('error', implode(', ', $validator->getErrors()));
+        if ($validator->fails()) {
+            Session::flash('error', implode(', ', $validator->allErrors()));
             View::redirect('/clients/create');
+            return;
         }
 
         try {
@@ -191,12 +198,17 @@ class ClientController extends Controller
         ];
 
         // Validation
-        $validator = new Validator($data);
-        $validator->required(['organization_name', 'contact_name', 'email', 'address', 'city', 'postal_code']);
-        $validator->email('email');
+        $validator = new Validator($data, [
+            'organization_name' => 'required',
+            'contact_name' => 'required',
+            'email' => 'required|email',
+            'address' => 'required',
+            'city' => 'required',
+            'postal_code' => 'required'
+        ]);
 
-        if (!$validator->validate()) {
-            Session::flash('error', implode(', ', $validator->getErrors()));
+        if ($validator->fails()) {
+            Session::flash('error', implode(', ', $validator->allErrors()));
             View::redirect('/clients/' . $id . '/edit');
             return;
         }
