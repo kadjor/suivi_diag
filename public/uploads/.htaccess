@@ -1,0 +1,7 @@
+# Désactiver le listing de répertoire
+Options -Indexes
+
+# Protéger les fichiers sensibles
+<FilesMatch "\.(php|sh|sql|log)$">
+    Require all denied
+</FilesMatch>

@@ -1,0 +1,16 @@
+# Bloquer tout accès direct aux rapports
+# Les téléchargements doivent passer par /reports/{id}/download
+
+# Désactiver le listing de répertoire
+Options -Indexes
+
+# Bloquer l'accès à tous les fichiers
+<FilesMatch ".*">
+    Require all denied
+</FilesMatch>
+
+# Autoriser uniquement l'accès via PHP (serveur interne)
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule .* - [F,L]
+</IfModule>
