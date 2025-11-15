@@ -157,7 +157,8 @@ return [
             'view_own_sites',
             'view_map',
             'download_reports',
-            'send_messages'
+            'send_messages',
+            'create_orders'
         ]
     ],
 

@@ -185,9 +185,17 @@ class Order extends Model
      */
     public function getByClient($clientId, $limit = 10)
     {
-        $sql = "SELECT o.*, s.label as status_label, s.color as status_color
+        $sql = "SELECT o.*,
+                       s.label as status_label,
+                       s.color as status_color,
+                       site.name as site_name,
+                       site.address as site_address,
+                       site.city as site_city,
+                       c.organization_name as client_name
                 FROM orders o
                 LEFT JOIN statuses s ON o.status_id = s.id
+                LEFT JOIN sites site ON o.site_id = site.id
+                LEFT JOIN clients c ON o.client_id = c.id
                 WHERE o.client_id = ?
                 ORDER BY o.created_at DESC
                 LIMIT ?";

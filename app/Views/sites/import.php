@@ -36,9 +36,14 @@
         <h2>Étape 2 : Mappage des colonnes</h2>
 
         <div class="alert alert-info">
-            <strong>ℹ️ Instructions :</strong>
-            <p>Faites correspondre chaque colonne de votre fichier Excel avec les champs de la base de données.</p>
-            <p><strong class="required">Les champs marqués d'un astérisque (*) sont obligatoires.</strong></p>
+            <strong>ℹ️ Instructions pour le mappage manuel :</strong>
+            <ol style="margin: 10px 0; padding-left: 20px;">
+                <li><strong>Identifiez vos colonnes Excel :</strong> Consultez le tableau d'aperçu ci-dessous pour voir les colonnes de votre fichier (A, B, C, etc.)</li>
+                <li><strong>Faites correspondre les colonnes :</strong> Pour chaque champ de la base de données, sélectionnez la colonne Excel correspondante</li>
+                <li><strong>Vérifiez l'aperçu :</strong> La colonne "Aperçu" affiche un exemple de donnée pour vérifier que le mappage est correct</li>
+                <li><strong>Champs obligatoires :</strong> Les lignes surlignées en <span style="background: #fff9e6; padding: 2px 6px;">jaune</span> avec une <span class="required">*</span> sont obligatoires</li>
+            </ol>
+            <p><strong>💡 Astuce :</strong> Commencez par les champs obligatoires (*), puis mappez les champs optionnels selon vos besoins.</p>
         </div>
 
         <div id="previewData"></div>
@@ -144,23 +149,61 @@
 }
 
 .mapping-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 15px;
     margin-bottom: 20px;
 }
 
-.mapping-item {
-    padding: 10px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    background: #f9f9f9;
+.mapping-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+    font-size: 14px;
 }
 
-.mapping-item label {
+.mapping-table thead {
+    background: #2196f3;
+    color: white;
+}
+
+.mapping-table th {
+    padding: 12px;
+    text-align: left;
     font-weight: bold;
-    display: block;
-    margin-bottom: 5px;
+}
+
+.mapping-table td {
+    padding: 10px;
+    border: 1px solid #ddd;
+}
+
+.mapping-table tbody tr {
+    background: white;
+}
+
+.mapping-table tbody tr:hover {
+    background: #f5f5f5;
+}
+
+.mapping-table tbody tr.mapping-required {
+    background: #fff9e6;
+}
+
+.mapping-table tbody tr.mapping-required:hover {
+    background: #fff3cd;
+}
+
+.mapping-select {
+    width: 100%;
+    min-width: 200px;
+}
+
+.preview-cell {
+    background: #fafafa;
+    font-family: monospace;
+    font-size: 12px;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .preview-table {
@@ -299,40 +342,71 @@ function showMappingStep(data, clientId) {
 
     // Générer le mappage
     const fields = [
-        { name: 'numero_groupe', label: 'Numéro de groupe', required: true },
-        { name: 'numero_lot', label: 'Numéro de lot', required: true },
-        { name: 'nom_groupe', label: 'Nom du groupe', required: false },
-        { name: 'address', label: 'Adresse', required: true },
-        { name: 'city', label: 'Ville', required: true },
-        { name: 'postal_code', label: 'Code postal', required: true },
-        { name: 'numero_porte', label: 'Numéro de porte', required: false },
-        { name: 'niveau', label: 'Niveau', required: false },
-        { name: 'identifiant_fiscal', label: 'Identifiant fiscal', required: false },
-        { name: 'nommage_rapport', label: 'Nommage rapport', required: false },
-        { name: 'numero_batiment', label: 'Numéro de bâtiment', required: false },
-        { name: 'numero_entree', label: 'Numéro d\'entrée', required: false }
+        { name: 'name', label: 'Nom du site', required: false, description: 'Nom descriptif du site (optionnel, laissé vide si non fourni)' },
+        { name: 'numero_groupe', label: 'Numéro de groupe', required: true, description: 'Identifiant unique du groupe de lots' },
+        { name: 'numero_lot', label: 'Numéro de lot', required: true, description: 'Numéro du lot dans le groupe' },
+        { name: 'nom_groupe', label: 'Nom du groupe', required: false, description: 'Nom descriptif du groupe (optionnel)' },
+        { name: 'address', label: 'Adresse', required: true, description: 'Adresse complète du site' },
+        { name: 'city', label: 'Ville', required: true, description: 'Ville où se trouve le site' },
+        { name: 'postal_code', label: 'Code postal', required: true, description: 'Code postal (5 chiffres)' },
+        { name: 'latitude', label: 'Latitude', required: false, description: 'Coordonnée GPS latitude (décimal, ex: 48.8566)' },
+        { name: 'longitude', label: 'Longitude', required: false, description: 'Coordonnée GPS longitude (décimal, ex: 2.3522)' },
+        { name: 'numero_porte', label: 'Numéro de porte', required: false, description: 'Numéro de porte ou d\'appartement' },
+        { name: 'niveau', label: 'Niveau', required: false, description: 'Étage ou niveau du lot' },
+        { name: 'identifiant_fiscal', label: 'Identifiant fiscal', required: false, description: 'Référence cadastrale ou fiscale' },
+        { name: 'nommage_rapport', label: 'Nommage rapport', required: false, description: 'Format de nom pour les rapports' },
+        { name: 'numero_batiment', label: 'Numéro de bâtiment', required: false, description: 'Numéro ou nom du bâtiment' },
+        { name: 'numero_entree', label: 'Numéro d\'entrée', required: false, description: 'Numéro d\'entrée ou de cage d\'escalier' }
     ];
 
-    let mappingHtml = '';
+    let mappingHtml = '<table class="mapping-table"><thead><tr><th>Champ de la base</th><th>Description</th><th>Colonne Excel</th><th>Aperçu</th></tr></thead><tbody>';
+
     fields.forEach(field => {
         const requiredMark = field.required ? ' <span class="required">*</span>' : '';
+        const requiredClass = field.required ? 'mapping-required' : '';
+
         mappingHtml += `
-            <div class="mapping-item">
-                <label>${field.label}${requiredMark}</label>
-                <select name="mapping[${field.name}]" class="form-control" ${field.required ? 'required' : ''}>
-                    <option value="">-- Ne pas importer --</option>
-                    ${data.headers.map((header, index) => {
-                        const columnLetter = String.fromCharCode(65 + index);
-                        const selected = header.toLowerCase().includes(field.name) ||
-                                        header.toLowerCase().includes(field.label.toLowerCase()) ? 'selected' : '';
-                        return `<option value="${columnLetter}" ${selected}>${columnLetter} - ${header || '(vide)'}</option>`;
-                    }).join('')}
-                </select>
-            </div>
+            <tr class="${requiredClass}">
+                <td><strong>${field.label}${requiredMark}</strong></td>
+                <td><small>${field.description}</small></td>
+                <td>
+                    <select name="mapping[${field.name}]" class="form-control mapping-select" ${field.required ? 'required' : ''} data-field="${field.name}">
+                        <option value="">-- Sélectionner une colonne --</option>
+                        ${data.headers.map((header, index) => {
+                            const columnLetter = String.fromCharCode(65 + index);
+                            return `<option value="${columnLetter}">${columnLetter} - ${header || '(colonne vide)'}</option>`;
+                        }).join('')}
+                    </select>
+                </td>
+                <td class="preview-cell" id="preview_${field.name}">-</td>
+            </tr>
         `;
     });
 
+    mappingHtml += '</tbody></table>';
+
     document.getElementById('mappingGrid').innerHTML = mappingHtml;
+
+    // Ajouter un listener pour afficher l'aperçu lors du changement de mappage
+    document.querySelectorAll('.mapping-select').forEach(select => {
+        select.addEventListener('change', function() {
+            const fieldName = this.dataset.field;
+            const columnLetter = this.value;
+            const previewCell = document.getElementById('preview_' + fieldName);
+
+            if (columnLetter) {
+                const columnIndex = columnLetter.charCodeAt(0) - 65;
+                const sampleValue = data.sampleRows[0] && data.sampleRows[0][columnIndex]
+                    ? data.sampleRows[0][columnIndex]
+                    : '-';
+                previewCell.textContent = sampleValue;
+                previewCell.style.background = '#e8f5e9';
+            } else {
+                previewCell.textContent = '-';
+                previewCell.style.background = '';
+            }
+        });
+    });
 }
 
 // Traiter l'import

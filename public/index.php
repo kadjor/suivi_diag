@@ -33,6 +33,12 @@ if ($requestUri === '/deploy/migrations' || strpos($requestUri, '/deploy/migrati
     if (!defined('APP_PATH')) define('APP_PATH', ROOT_PATH . '/app');
     if (!defined('CONFIG_PATH')) define('CONFIG_PATH', ROOT_PATH . '/config');
 
+    // Chargement de l'autoloader Composer
+    $composerAutoload = ROOT_PATH . '/vendor/autoload.php';
+    if (file_exists($composerAutoload)) {
+        @require_once $composerAutoload;
+    }
+
     // Autoloader minimal
     spl_autoload_register(function ($class) {
         $file = APP_PATH . '/' . str_replace('\\', '/', $class) . '.php';
@@ -43,25 +49,68 @@ if ($requestUri === '/deploy/migrations' || strpos($requestUri, '/deploy/migrati
 
     // Initialiser la base de données
     try {
-        $dbConfig = require CONFIG_PATH . '/database.php';
+        // Vérifier que le fichier de config existe
+        $dbConfigFile = CONFIG_PATH . '/database.php';
+        if (!file_exists($dbConfigFile)) {
+            header('Content-Type: application/json; charset=utf-8', true);
+            die(json_encode(['error' => 'Fichier database.php manquant. Copiez database.php.example vers database.php', 'migrations' => [], 'success' => false]));
+        }
+
+        $dbConfig = @require $dbConfigFile;
+
+        if (!$dbConfig || !is_array($dbConfig)) {
+            header('Content-Type: application/json; charset=utf-8', true);
+            die(json_encode(['error' => 'Configuration database.php invalide', 'migrations' => [], 'success' => false]));
+        }
+
         Core\Database::init($dbConfig);
-        $db = Core\Database::getInstance()->getConnection();
-    } catch (Exception $e) {
+        $db = Core\Database::getConnection();
+
+        if (!$db) {
+            header('Content-Type: application/json; charset=utf-8', true);
+            die(json_encode(['error' => 'Impossible de se connecter à la base de données', 'migrations' => [], 'success' => false]));
+        }
+    } catch (\Throwable $e) {
         header('Content-Type: application/json; charset=utf-8', true);
-        die(json_encode(['error' => 'DB connection failed', 'migrations' => [], 'success' => false]));
+        die(json_encode(['error' => 'Erreur DB: ' . $e->getMessage(), 'migrations' => [], 'success' => false]));
     }
 
     // Traiter les migrations
     try {
         $migrationsDir = ROOT_PATH . '/database/migrations';
         $migrations = [];
+        $debug = [];
+
+        // Debug: vérifier le chemin
+        $debug['root_path'] = ROOT_PATH;
+        $debug['migrations_dir'] = $migrationsDir;
+        $debug['dir_exists'] = is_dir($migrationsDir);
+        $debug['dir_readable'] = is_readable($migrationsDir);
 
         if (!is_dir($migrationsDir)) {
             header('Content-Type: application/json; charset=utf-8', true);
-            die(json_encode(['migrations' => [], 'success' => true]));
+            die(json_encode([
+                'migrations' => [],
+                'success' => true,
+                'debug' => $debug,
+                'message' => 'Le dossier database/migrations n\'existe pas'
+            ]));
         }
 
-        $files = @glob($migrationsDir . '/*.sql');
+        if (!is_readable($migrationsDir)) {
+            header('Content-Type: application/json; charset=utf-8', true);
+            die(json_encode([
+                'migrations' => [],
+                'success' => false,
+                'debug' => $debug,
+                'error' => 'Le dossier database/migrations n\'est pas accessible en lecture'
+            ]));
+        }
+
+        $files = glob($migrationsDir . '/*.sql');
+        $debug['glob_pattern'] = $migrationsDir . '/*.sql';
+        $debug['files_found'] = $files !== false ? count($files) : 0;
+
         if ($files === false || $files === null) {
             $files = [];
         }
@@ -85,8 +134,8 @@ if ($requestUri === '/deploy/migrations' || strpos($requestUri, '/deploy/migrati
                         $stmt->close();
                     }
                 }
-            } catch (Exception $e) {
-                // Ignorer
+            } catch (\Throwable $e) {
+                // Ignorer silencieusement
             }
 
             $migrations[] = [
@@ -98,14 +147,18 @@ if ($requestUri === '/deploy/migrations' || strpos($requestUri, '/deploy/migrati
         }
 
         header('Content-Type: application/json; charset=utf-8', true);
-        die(json_encode(['migrations' => $migrations, 'success' => true]));
+        die(json_encode([
+            'migrations' => $migrations,
+            'success' => true,
+            'debug' => $debug
+        ]));
 
-    } catch (Exception $e) {
+    } catch (\Throwable $e) {
         while (@ob_get_level() > 0) {
             @ob_end_clean();
         }
         header('Content-Type: application/json; charset=utf-8', true);
-        die(json_encode(['error' => $e->getMessage(), 'migrations' => [], 'success' => false]));
+        die(json_encode(['error' => 'Erreur migrations: ' . $e->getMessage(), 'migrations' => [], 'success' => false]));
     }
 }
 
@@ -124,6 +177,12 @@ if (!defined('PUBLIC_PATH')) define('PUBLIC_PATH', ROOT_PATH . '/public');
 if (!defined('UPLOAD_PATH')) define('UPLOAD_PATH', PUBLIC_PATH . '/uploads');
 if (!defined('LOG_PATH')) define('LOG_PATH', ROOT_PATH . '/logs');
 if (!defined('LIB_PATH')) define('LIB_PATH', ROOT_PATH . '/libs');
+
+// Chargement de l'autoloader Composer (pour les bibliothèques tierces)
+$composerAutoload = ROOT_PATH . '/vendor/autoload.php';
+if (file_exists($composerAutoload)) {
+    require_once $composerAutoload;
+}
 
 // Chargement de la configuration
 $config = require CONFIG_PATH . '/app.php';
@@ -256,6 +315,9 @@ $router->post('/sites/{id}/update', 'Controllers\SiteController@update');
 $router->get('/api/sites/search-clients', 'Controllers\SiteController@searchClients');
 $router->get('/api/sites/search', 'Controllers\SiteController@searchSites');
 $router->get('/api/sites/search-lot', 'Controllers\SiteController@searchLot');
+$router->get('/api/sites/by-client/{clientId}', 'Controllers\SiteController@getSitesByClientId');
+$router->post('/sites/delete-bulk', 'Controllers\SiteController@deleteBulk');
+$router->post('/sites/delete-by-client', 'Controllers\SiteController@deleteByClient');
 
 // Routes protégées - Clients
 $router->get('/clients', 'Controllers\ClientController@index');
@@ -264,6 +326,21 @@ $router->post('/clients/store', 'Controllers\ClientController@store');
 $router->get('/clients/{id}', 'Controllers\ClientController@show');
 $router->get('/clients/{id}/edit', 'Controllers\ClientController@edit');
 $router->post('/clients/{id}/update', 'Controllers\ClientController@update');
+
+// Routes protégées - Cessions
+$router->get('/cessions', 'Controllers\CessionController@index');
+$router->get('/cessions/create', 'Controllers\CessionController@create');
+$router->post('/cessions/store', 'Controllers\CessionController@store');
+$router->get('/cessions/{id}', 'Controllers\CessionController@show');
+$router->post('/cessions/{id}/add-site', 'Controllers\CessionController@addSite');
+$router->post('/cessions/{id}/remove-site', 'Controllers\CessionController@removeSite');
+$router->post('/cessions/{id}/submit', 'Controllers\CessionController@submit');
+$router->post('/cessions/{id}/validate', 'Controllers\CessionController@validate');
+$router->post('/cessions/{id}/start-transfer', 'Controllers\CessionController@startTransfer');
+$router->post('/cessions/{id}/cancel', 'Controllers\CessionController@cancel');
+
+// API Cessions
+$router->get('/api/cessions/sites-by-client', 'Controllers\CessionController@getSitesByClient');
 
 // Routes protégées - Cartographie
 $router->get('/map', 'Controllers\MapController@index');
@@ -320,6 +397,9 @@ $router->post('/admin/statuses/update-color', 'Controllers\AdminController@updat
 // Routes protégées - Déploiement (admin seulement)
 $router->get('/deploy', 'Controllers\DeployController@index');
 $router->post('/deploy/pull', 'Controllers\DeployController@pull');
+$router->post('/deploy/checkout-branch', 'Controllers\DeployController@checkoutBranch');
+$router->post('/deploy/add-custom-branch', 'Controllers\DeployController@addCustomBranch');
+$router->post('/deploy/delete-custom-branch', 'Controllers\DeployController@deleteCustomBranch');
 $router->post('/deploy/download-github', 'Controllers\DeployController@downloadFromGithub');
 $router->post('/deploy/apply-permissions', 'Controllers\DeployController@applyPermissions');
 $router->get('/deploy/diff', 'Controllers\DeployController@diff');

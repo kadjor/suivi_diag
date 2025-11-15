@@ -29,26 +29,4 @@ ALTER TABLE `orders`
     ADD COLUMN `numero_lot` VARCHAR(50) NULL COMMENT 'Numéro de lot pour la commande' AFTER `order_number`,
     ADD INDEX `idx_numero_lot` (`numero_lot`);
 
--- Création d'une table pour tracker les imports de patrimoine Excel
-CREATE TABLE IF NOT EXISTS `site_imports` (
-    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    `client_id` INT UNSIGNED NOT NULL COMMENT 'Client concerné par l\'import',
-    `filename` VARCHAR(255) NOT NULL,
-    `filepath` VARCHAR(500) NOT NULL,
-    `imported_by` INT UNSIGNED NOT NULL,
-    `imported_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    `status` ENUM('pending', 'processing', 'completed', 'failed') DEFAULT 'pending',
-    `rows_total` INT DEFAULT 0,
-    `rows_processed` INT DEFAULT 0,
-    `rows_success` INT DEFAULT 0,
-    `rows_errors` INT DEFAULT 0,
-    `log_json` JSON NULL COMMENT 'Détails erreurs/warnings ligne par ligne',
-    `column_mapping` JSON NULL COMMENT 'Correspondance colonnes Excel <-> champs DB',
-    `completed_at` TIMESTAMP NULL,
-    INDEX `idx_client` (`client_id`),
-    INDEX `idx_status` (`status`),
-    INDEX `idx_imported_by` (`imported_by`),
-    INDEX `idx_imported_at` (`imported_at`),
-    FOREIGN KEY (`client_id`) REFERENCES `clients`(`id`) ON DELETE CASCADE,
-    FOREIGN KEY (`imported_by`) REFERENCES `users`(`id`) ON DELETE RESTRICT
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+-- Note: La table site_imports est créée dans migration 009 avec le schéma complet

@@ -74,6 +74,108 @@ $currentVersion = file_exists($versionFile) ? trim(file_get_contents($versionFil
 
         <?php if ($isGitRepo): ?>
         <!-- Actions Git -->
+
+        <!-- Changement de branche -->
+        <?php if (!empty($branches['local']) || !empty($branches['remote'])): ?>
+        <div class="github-form" style="margin-bottom: 20px;">
+            <h3>🌿 Changer de branche</h3>
+            <div class="form-row">
+                <div class="form-group" style="flex: 1;">
+                    <label for="git_branch_select">Branche:</label>
+                    <select id="git_branch_select" class="form-control">
+                        <?php if (!empty($branches['local'])): ?>
+                        <optgroup label="Branches locales Git">
+                            <?php foreach ($branches['local'] as $branch): ?>
+                                <option value="<?= htmlspecialchars($branch) ?>" <?= $branch === $currentBranch ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($branch) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </optgroup>
+                        <?php endif; ?>
+                        <?php if (!empty($branches['remote'])): ?>
+                        <optgroup label="Branches distantes Git">
+                            <?php foreach ($branches['remote'] as $branch): ?>
+                                <option value="<?= htmlspecialchars($branch) ?>">
+                                    origin/<?= htmlspecialchars($branch) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </optgroup>
+                        <?php endif; ?>
+                        <?php if (!empty($customBranches)): ?>
+                        <optgroup label="Branches personnalisées">
+                            <?php foreach ($customBranches as $customBranch): ?>
+                                <option value="<?= htmlspecialchars($customBranch['branch_name']) ?>">
+                                    <?= htmlspecialchars($customBranch['branch_name']) ?><?= !empty($customBranch['description']) ? ' - ' . htmlspecialchars($customBranch['description']) : '' ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </optgroup>
+                        <?php endif; ?>
+                    </select>
+                </div>
+                <div style="display: flex; align-items: flex-end;">
+                    <button id="btnCheckoutBranch" class="btn btn-warning">
+                        🔀 Changer de branche
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gestion des branches personnalisées -->
+        <div class="github-form" style="margin-bottom: 20px;">
+            <h3>🏷️ Gérer les branches personnalisées</h3>
+            <div class="form-row">
+                <div class="form-group" style="flex: 1;">
+                    <label for="new_branch_name">Nom de la branche:</label>
+                    <input type="text" id="new_branch_name" class="form-control" placeholder="ex: feature/ma-branche">
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label for="new_branch_description">Description (optionnel):</label>
+                    <input type="text" id="new_branch_description" class="form-control" placeholder="ex: Branche de développement">
+                </div>
+                <div style="display: flex; align-items: flex-end;">
+                    <button id="btnAddCustomBranch" class="btn btn-primary">
+                        ➕ Ajouter
+                    </button>
+                </div>
+            </div>
+
+            <?php if (!empty($customBranches)): ?>
+            <div class="custom-branches-list" style="margin-top: 15px;">
+                <h4>Branches enregistrées:</h4>
+                <table class="table" style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr>
+                            <th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">Nom</th>
+                            <th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">Description</th>
+                            <th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">Créé par</th>
+                            <th style="padding: 8px; text-align: center; border-bottom: 1px solid #ddd;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($customBranches as $customBranch): ?>
+                        <tr>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;"><code><?= htmlspecialchars($customBranch['branch_name']) ?></code></td>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;"><?= htmlspecialchars($customBranch['description'] ?? '-') ?></td>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee;"><?= htmlspecialchars(trim(($customBranch['first_name'] ?? '') . ' ' . ($customBranch['last_name'] ?? ''))) ?></td>
+                            <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: center;">
+                                <button class="btn btn-sm btn-danger" onclick="deleteCustomBranch(<?= $customBranch['id'] ?>)">
+                                    🗑️ Supprimer
+                                </button>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php else: ?>
+            <div class="alert" style="margin-top: 15px; padding: 12px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px;">
+                <strong>ℹ️ Information:</strong> Aucune branche personnalisée enregistrée.<br>
+                <small>Si vous venez de mettre à jour le code, exécutez la <strong>migration 008</strong> dans la section "Migrations" ci-dessous pour activer cette fonctionnalité.</small>
+            </div>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
+
         <div class="action-buttons">
             <button id="btnDiff" class="btn btn-info">
                 📋 Voir les différences
@@ -112,7 +214,51 @@ $currentVersion = file_exists($versionFile) ? trim(file_get_contents($versionFil
                 </div>
                 <div class="form-group">
                     <label for="github_branch">Branche:</label>
-                    <input type="text" id="github_branch" value="main" class="form-control">
+                    <select id="github_branch" class="form-control">
+                        <?php if (!empty($branches['local']) || !empty($branches['remote']) || !empty($customBranches)): ?>
+                            <?php if (!empty($branches['local'])): ?>
+                            <optgroup label="Branches locales Git">
+                                <?php foreach ($branches['local'] as $branch): ?>
+                                    <option value="<?= htmlspecialchars($branch) ?>" <?= $branch === $currentBranch ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($branch) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </optgroup>
+                            <?php endif; ?>
+                            <?php if (!empty($branches['remote'])): ?>
+                            <optgroup label="Branches distantes Git">
+                                <?php foreach ($branches['remote'] as $branch): ?>
+                                    <option value="<?= htmlspecialchars($branch) ?>" <?= $branch === $currentBranch ? 'selected' : '' ?>>
+                                        <?= htmlspecialchars($branch) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </optgroup>
+                            <?php endif; ?>
+                            <?php if (!empty($customBranches)): ?>
+                            <optgroup label="Branches personnalisées">
+                                <?php foreach ($customBranches as $customBranch): ?>
+                                    <option value="<?= htmlspecialchars($customBranch['branch_name']) ?>">
+                                        <?= htmlspecialchars($customBranch['branch_name']) ?><?= !empty($customBranch['description']) ? ' - ' . htmlspecialchars($customBranch['description']) : '' ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </optgroup>
+                            <?php endif; ?>
+                        <?php else: ?>
+                            <option value="main" selected>main</option>
+                            <option value="master">master</option>
+                            <option value="develop">develop</option>
+                            <option value="staging">staging</option>
+                        <?php endif; ?>
+                        <?php if (!empty($customBranches)): ?>
+                            <optgroup label="Branches personnalisées">
+                                <?php foreach ($customBranches as $customBranch): ?>
+                                    <option value="<?= htmlspecialchars($customBranch['branch_name']) ?>">
+                                        <?= htmlspecialchars($customBranch['branch_name']) ?><?= !empty($customBranch['description']) ? ' - ' . htmlspecialchars($customBranch['description']) : '' ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </optgroup>
+                        <?php endif; ?>
+                    </select>
                 </div>
             </div>
             <div class="action-buttons">
@@ -327,6 +473,176 @@ if (btnPull) {
         }
         };
     });
+}
+
+// Checkout Branch (changer de branche)
+const btnCheckoutBranch = document.getElementById('btnCheckoutBranch');
+if (btnCheckoutBranch) {
+    btnCheckoutBranch.addEventListener('click', async function() {
+        const resultDiv = document.getElementById('actionResult');
+        const branchSelect = document.getElementById('git_branch_select');
+        const selectedBranch = branchSelect.value;
+
+        if (!selectedBranch) {
+            resultDiv.innerHTML = '<div class="result-error">❌ Veuillez sélectionner une branche</div>';
+            return;
+        }
+
+        // Confirmation
+        resultDiv.innerHTML = `
+            <div class="confirm-box">
+                <p><strong>⚠️ Confirmer le changement de branche</strong></p>
+                <p>Vous allez changer vers la branche: <strong>${escapeHtml(selectedBranch)}</strong></p>
+                <p>Un backup sera automatiquement créé.</p>
+                <div style="margin-top: 15px;">
+                    <button class="btn btn-primary" id="confirmCheckout">✓ Confirmer</button>
+                    <button class="btn btn-secondary" id="cancelCheckout">✗ Annuler</button>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('cancelCheckout').onclick = () => {
+            resultDiv.innerHTML = '';
+        };
+
+        document.getElementById('confirmCheckout').onclick = async () => {
+            this.disabled = true;
+            this.textContent = '⏳ Changement en cours...';
+            resultDiv.innerHTML = '<div class="loading">⏳ Changement de branche en cours...</div>';
+
+            try {
+                const formData = new FormData();
+                formData.append('branch', selectedBranch);
+
+                const response = await fetch('/deploy/checkout-branch', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                let resultHtml = '';
+
+                if (data.success) {
+                    resultHtml = '<div class="result-success"><h3>✅ Changement de branche réussi !</h3>';
+                    resultHtml += '<p>Branche actuelle: <strong>' + escapeHtml(selectedBranch) + '</strong></p>';
+                    resultHtml += '<p>La page va se recharger...</p>';
+                    resultHtml += '</div>';
+
+                    // Recharger après 2 secondes
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
+                } else {
+                    resultHtml = '<div class="result-error"><h3>❌ Erreur lors du changement de branche</h3>';
+                    if (data.error) {
+                        resultHtml += '<p>' + escapeHtml(data.error) + '</p>';
+                    }
+                    resultHtml += '</div>';
+                }
+
+                resultDiv.innerHTML = resultHtml;
+
+            } catch (error) {
+                resultDiv.innerHTML = '<div class="result-error">❌ Erreur: ' + escapeHtml(error.message) + '</div>';
+            } finally {
+                this.disabled = false;
+                this.textContent = '🔀 Changer de branche';
+            }
+        };
+    });
+}
+
+// Add Custom Branch
+const btnAddCustomBranch = document.getElementById('btnAddCustomBranch');
+if (btnAddCustomBranch) {
+    btnAddCustomBranch.addEventListener('click', async function() {
+        const branchName = document.getElementById('new_branch_name').value.trim();
+        const description = document.getElementById('new_branch_description').value.trim();
+        const resultDiv = document.getElementById('actionResult');
+
+        if (!branchName) {
+            resultDiv.innerHTML = '<div class="result-error">❌ Veuillez saisir un nom de branche</div>';
+            return;
+        }
+
+        this.disabled = true;
+        this.textContent = '⏳ Ajout en cours...';
+        resultDiv.innerHTML = '<div class="loading">⏳ Ajout de la branche...</div>';
+
+        try {
+            const formData = new FormData();
+            formData.append('branch_name', branchName);
+            formData.append('description', description);
+
+            const response = await fetch('/deploy/add-custom-branch', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                resultDiv.innerHTML = '<div class="result-success">✅ ' + escapeHtml(data.message) + '</div>';
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            } else {
+                resultDiv.innerHTML = '<div class="result-error">❌ Erreur: ' + escapeHtml(data.error) + '</div>';
+            }
+        } catch (error) {
+            resultDiv.innerHTML = '<div class="result-error">❌ Erreur: ' + escapeHtml(error.message) + '</div>';
+        } finally {
+            this.disabled = false;
+            this.textContent = '➕ Ajouter la branche';
+        }
+    });
+}
+
+// Delete Custom Branch
+function deleteCustomBranch(branchId) {
+    const resultDiv = document.getElementById('actionResult');
+
+    resultDiv.innerHTML = `
+        <div class="confirm-box warning">
+            <p><strong>⚠️ Confirmer la suppression</strong></p>
+            <p>Voulez-vous vraiment supprimer cette branche personnalisée?</p>
+            <div style="margin-top: 15px;">
+                <button class="btn btn-danger" id="confirmDeleteBranch">✓ Confirmer</button>
+                <button class="btn btn-secondary" id="cancelDeleteBranch">✗ Annuler</button>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('cancelDeleteBranch').onclick = () => {
+        resultDiv.innerHTML = '';
+    };
+
+    document.getElementById('confirmDeleteBranch').onclick = async () => {
+        resultDiv.innerHTML = '<div class="loading">⏳ Suppression en cours...</div>';
+
+        try {
+            const formData = new FormData();
+            formData.append('branch_id', branchId);
+
+            const response = await fetch('/deploy/delete-custom-branch', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                resultDiv.innerHTML = '<div class="result-success">✅ ' + escapeHtml(data.message) + '</div>';
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            } else {
+                resultDiv.innerHTML = '<div class="result-error">❌ Erreur: ' + escapeHtml(data.error) + '</div>';
+            }
+        } catch (error) {
+            resultDiv.innerHTML = '<div class="result-error">❌ Erreur: ' + escapeHtml(error.message) + '</div>';
+        }
+    };
 }
 
 // Reset
@@ -607,11 +923,39 @@ document.getElementById('btnLoadMigrations')?.addEventListener('click', async fu
         } else {
             html = '<p class="no-data">Aucune migration trouvée dans database/migrations/</p>';
             btnRunMigrations.style.display = 'none';
+
+            // Afficher les infos de debug si disponibles
+            if (data.debug) {
+                html += '<div class="alert alert-info" style="margin-top: 15px; font-size: 12px;">';
+                html += '<strong>ℹ️ Informations de débogage:</strong><br>';
+                html += '<code style="display: block; background: #f5f5f5; padding: 10px; margin-top: 5px; white-space: pre;">';
+                html += 'ROOT_PATH: ' + escapeHtml(data.debug.root_path || 'N/A') + '\n';
+                html += 'Dossier migrations: ' + escapeHtml(data.debug.migrations_dir || 'N/A') + '\n';
+                html += 'Dossier existe: ' + (data.debug.dir_exists ? '✓ Oui' : '✗ Non') + '\n';
+                html += 'Dossier accessible: ' + (data.debug.dir_readable ? '✓ Oui' : '✗ Non') + '\n';
+                html += 'Pattern glob: ' + escapeHtml(data.debug.glob_pattern || 'N/A') + '\n';
+                html += 'Fichiers trouvés: ' + (data.debug.files_found || 0);
+                html += '</code></div>';
+            }
+
+            if (data.message) {
+                html += '<div class="alert alert-warning" style="margin-top: 10px;">' + escapeHtml(data.message) + '</div>';
+            }
+
+            if (data.error) {
+                html += '<div class="alert alert-danger" style="margin-top: 10px;">' + escapeHtml(data.error) + '</div>';
+            }
         }
 
         migrationsListDiv.innerHTML = html;
     } catch (error) {
-        migrationsListDiv.innerHTML = '<div class="result-error">❌ Erreur: ' + escapeHtml(error.message) + '</div>';
+        let errorHtml = '<div class="result-error">❌ Erreur: ' + escapeHtml(error.message) + '</div>';
+        errorHtml += '<div class="alert alert-info" style="margin-top: 15px; font-size: 12px;">';
+        errorHtml += '<strong>Détails de l\'erreur:</strong><br>';
+        errorHtml += '<code style="display: block; background: #f5f5f5; padding: 10px; margin-top: 5px;">';
+        errorHtml += error.stack || error.toString();
+        errorHtml += '</code></div>';
+        migrationsListDiv.innerHTML = errorHtml;
     } finally {
         this.disabled = false;
         this.textContent = '📋 Charger les migrations';

@@ -35,14 +35,27 @@ class DeployController extends Controller
         // Récupérer les informations Git si applicable
         $gitStatus = $isGitRepo ? $this->getGitStatus() : ['error' => 'Non-Git'];
         $currentBranch = $isGitRepo ? $this->getCurrentBranch() : 'N/A';
+        $branches = $isGitRepo ? $this->getAllBranches() : [];
         $lastCommits = $isGitRepo ? $this->getLastCommits(10) : [];
         $hasChanges = $isGitRepo ? $this->hasLocalChanges() : false;
         $deployLogs = $this->getDeployLogs(20);
+
+        // Récupérer les branches personnalisées (gérer le cas où la table n'existe pas encore)
+        $customBranches = [];
+        try {
+            $customBranchModel = new \Models\CustomBranch();
+            $customBranches = $customBranchModel->getAll();
+        } catch (\Exception $e) {
+            // La table n'existe pas encore - migration 008 doit être exécutée
+            error_log('CustomBranch table not found: ' . $e->getMessage());
+        }
 
         View::render('deploy.index', [
             'isGitRepo' => $isGitRepo,
             'gitStatus' => $gitStatus,
             'currentBranch' => $currentBranch,
+            'branches' => $branches,
+            'customBranches' => $customBranches,
             'lastCommits' => $lastCommits,
             'hasChanges' => $hasChanges,
             'deployLogs' => $deployLogs,
@@ -89,6 +102,49 @@ class DeployController extends Controller
         }
 
         return trim($output[0]);
+    }
+
+    /**
+     * Récupère toutes les branches (locales et distantes)
+     */
+    private function getAllBranches()
+    {
+        $output = [];
+
+        // Récupérer les branches locales et distantes
+        exec("cd {$this->appDir} && git branch -a 2>&1", $output, $returnCode);
+
+        if ($returnCode !== 0) {
+            return [];
+        }
+
+        $branches = [
+            'local' => [],
+            'remote' => []
+        ];
+
+        foreach ($output as $line) {
+            $line = trim($line);
+
+            // Ignorer les lignes vides ou avec HEAD
+            if (empty($line) || strpos($line, 'HEAD') !== false) {
+                continue;
+            }
+
+            // Enlever l'indicateur de branche courante (*)
+            $line = preg_replace('/^\*\s+/', '', $line);
+
+            // Vérifier si c'est une branche distante
+            if (strpos($line, 'remotes/') === 0) {
+                // Nettoyer le nom de la branche distante
+                $branchName = str_replace('remotes/origin/', '', $line);
+                $branches['remote'][] = $branchName;
+            } else {
+                $branches['local'][] = $line;
+            }
+        }
+
+        return $branches;
     }
 
     /**
@@ -210,6 +266,113 @@ class DeployController extends Controller
             $results['errors'][] = $e->getMessage();
             $this->log('✗ ERREUR: ' . $e->getMessage());
             $this->log('===== DÉPLOIEMENT ÉCHOUÉ =====');
+        }
+
+        View::json($results);
+    }
+
+    /**
+     * Change de branche Git
+     */
+    public function checkoutBranch()
+    {
+        $branch = $_POST['branch'] ?? null;
+
+        if (!$branch) {
+            View::json(['success' => false, 'error' => 'Branche non spécifiée']);
+            return;
+        }
+
+        $this->log('===== CHANGEMENT DE BRANCHE =====');
+        $this->log('Utilisateur: ' . Auth::user()['email']);
+        $this->log('Branche cible: ' . $branch);
+        $this->log('Date: ' . date('Y-m-d H:i:s'));
+
+        $results = [
+            'success' => false,
+            'messages' => [],
+            'errors' => []
+        ];
+
+        try {
+            // 1. Créer un backup avant le changement
+            $this->log('Création du backup...');
+            $backupResult = $this->createBackup();
+            if (!$backupResult['success']) {
+                throw new \Exception('Échec de la création du backup: ' . $backupResult['error']);
+            }
+            $results['messages'][] = 'Backup créé: ' . $backupResult['file'];
+            $this->log('✓ Backup créé: ' . $backupResult['file']);
+
+            // 2. Vérifier les changements locaux
+            if ($this->hasLocalChanges()) {
+                $this->log('⚠ Changements locaux détectés - stash');
+                exec("cd {$this->appDir} && git stash 2>&1", $output, $returnCode);
+                $results['messages'][] = 'Changements locaux mis de côté (stash)';
+            }
+
+            // 3. Fetch pour s'assurer d'avoir toutes les branches
+            $this->log('Récupération des branches distantes...');
+            exec("cd {$this->appDir} && git fetch origin 2>&1", $output, $returnCode);
+            if ($returnCode !== 0) {
+                throw new \Exception('Erreur git fetch: ' . implode("\n", $output));
+            }
+            $this->log('✓ Fetch terminé');
+
+            // 4. Checkout de la branche
+            $this->log('Changement vers la branche ' . $branch . '...');
+            $output = [];
+
+            // Si c'est une branche distante, créer une branche locale qui la suit
+            if (strpos($branch, 'origin/') === 0) {
+                $localBranch = str_replace('origin/', '', $branch);
+                exec("cd {$this->appDir} && git checkout -b {$localBranch} {$branch} 2>&1", $output, $returnCode);
+            } else {
+                // C'est une branche locale, checkout direct
+                exec("cd {$this->appDir} && git checkout {$branch} 2>&1", $output, $returnCode);
+            }
+
+            if ($returnCode !== 0) {
+                throw new \Exception('Erreur git checkout: ' . implode("\n", $output));
+            }
+
+            $checkoutOutput = implode("\n", $output);
+            $results['messages'][] = $checkoutOutput;
+            $this->log('✓ Checkout terminé: ' . $checkoutOutput);
+
+            // 5. Pull pour mettre à jour
+            $this->log('Mise à jour de la branche...');
+            exec("cd {$this->appDir} && git pull origin {$branch} 2>&1", $output, $returnCode);
+            if ($returnCode !== 0) {
+                $this->log('⚠ Pull échoué (peut-être déjà à jour)');
+            } else {
+                $this->log('✓ Pull terminé');
+            }
+
+            // 6. Restaurer les permissions
+            $this->log('Restauration des permissions...');
+            $permissionsResult = $this->restorePermissions();
+            if ($permissionsResult['success']) {
+                $results['messages'][] = 'Permissions restaurées';
+                $this->log('✓ Permissions restaurées');
+            }
+
+            // 7. Vider le cache si le dossier existe
+            if (is_dir($this->appDir . '/storage/cache')) {
+                $this->log('Nettoyage du cache...');
+                $this->clearCache();
+                $results['messages'][] = 'Cache nettoyé';
+                $this->log('✓ Cache nettoyé');
+            }
+
+            $results['success'] = true;
+            $results['messages'][] = 'Changement vers la branche ' . $branch . ' réussi !';
+            $this->log('===== CHANGEMENT DE BRANCHE RÉUSSI =====');
+
+        } catch (\Exception $e) {
+            $results['errors'][] = $e->getMessage();
+            $this->log('✗ ERREUR: ' . $e->getMessage());
+            $this->log('===== CHANGEMENT DE BRANCHE ÉCHOUÉ =====');
         }
 
         View::json($results);
@@ -751,7 +914,7 @@ class DeployController extends Controller
             }
 
             echo "\n=== TEST CONNEXION DB ===\n";
-            $db = \Core\Database::getInstance()->getConnection();
+            $db = \Core\Database::getConnection();
             echo "Connexion DB: OK\n";
 
             echo "\n=== FIN DIAGNOSTIC ===\n";
@@ -847,7 +1010,7 @@ class DeployController extends Controller
     private function isMigrationExecutedSafe($migrationName)
     {
         try {
-            $db = \Core\Database::getInstance()->getConnection();
+            $db = \Core\Database::getConnection();
 
             // Vérifier si la table migrations existe
             $result = @$db->query("SHOW TABLES LIKE 'migrations'");
@@ -857,8 +1020,8 @@ class DeployController extends Controller
                 return false;
             }
 
-            // Vérifier si cette migration a été exécutée
-            $stmt = @$db->prepare("SELECT id FROM migrations WHERE migration = ? LIMIT 1");
+            // Vérifier si cette migration a été exécutée (utilise 'filename' conforme au schema.sql)
+            $stmt = @$db->prepare("SELECT id FROM migrations WHERE filename = ? LIMIT 1");
             if (!$stmt) {
                 return false;
             }
@@ -880,7 +1043,7 @@ class DeployController extends Controller
     private function isMigrationExecuted($migrationName)
     {
         try {
-            $db = \Core\Database::getInstance()->getConnection();
+            $db = \Core\Database::getConnection();
 
             // Vérifier si la table migrations existe
             $result = $db->query("SHOW TABLES LIKE 'migrations'");
@@ -890,8 +1053,8 @@ class DeployController extends Controller
                 return false;
             }
 
-            // Vérifier si cette migration a été exécutée
-            $stmt = $db->prepare("SELECT id FROM migrations WHERE migration = ? LIMIT 1");
+            // Vérifier si cette migration a été exécutée (utilise 'filename' conforme au schema.sql)
+            $stmt = $db->prepare("SELECT id FROM migrations WHERE filename = ? LIMIT 1");
             $stmt->bind_param('s', $migrationName);
             $stmt->execute();
             $result = $stmt->get_result();
@@ -909,17 +1072,39 @@ class DeployController extends Controller
     private function createMigrationsTable()
     {
         try {
-            $db = \Core\Database::getInstance()->getConnection();
-            $sql = "CREATE TABLE IF NOT EXISTS `migrations` (
-                `id` int(11) NOT NULL AUTO_INCREMENT,
-                `migration` varchar(255) NOT NULL,
-                `executed_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (`id`),
-                UNIQUE KEY `migration` (`migration`)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+            $db = \Core\Database::getConnection();
 
-            $db->query($sql);
-            $this->log('✓ Table migrations créée');
+            // Vérifier si la table existe
+            $result = $db->query("SHOW TABLES LIKE 'migrations'");
+            $tableExists = $result && $result->num_rows > 0;
+
+            if ($tableExists) {
+                // Vérifier si la colonne 'filename' existe (conforme au schema.sql)
+                $columnsResult = $db->query("SHOW COLUMNS FROM migrations LIKE 'filename'");
+                $hasCorrectSchema = $columnsResult && $columnsResult->num_rows > 0;
+
+                if (!$hasCorrectSchema) {
+                    // La table existe mais avec un mauvais schéma, la recréer
+                    $this->log('⚠ Table migrations existe avec un mauvais schéma, recréation...');
+                    $db->query("DROP TABLE IF EXISTS `migrations`");
+                    $tableExists = false;
+                }
+            }
+
+            if (!$tableExists) {
+                // Créer la table avec le bon schéma (conforme au schema.sql)
+                $sql = "CREATE TABLE `migrations` (
+                    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+                    `version` INT NOT NULL UNIQUE,
+                    `filename` VARCHAR(255) NOT NULL,
+                    `executed_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+
+                $db->query($sql);
+                $this->log('✓ Table migrations créée avec le bon schéma (conforme schema.sql)');
+            } else {
+                $this->log('✓ Table migrations existe déjà avec le bon schéma');
+            }
 
         } catch (\Exception $e) {
             $this->log('✗ Erreur création table migrations: ' . $e->getMessage());
@@ -973,7 +1158,7 @@ class DeployController extends Controller
             }
 
             sort($files);
-            $db = \Core\Database::getInstance()->getConnection();
+            $db = \Core\Database::getConnection();
 
             foreach ($files as $file) {
                 $migrationName = basename($file);
@@ -1014,8 +1199,12 @@ class DeployController extends Controller
                     }
 
                     // Enregistrer la migration comme exécutée
-                    $stmt = $db->prepare("INSERT INTO migrations (migration) VALUES (?)");
-                    $stmt->bind_param('s', $migrationName);
+                    // Extraire le numéro de version du nom de fichier (ex: 001, 002, etc.)
+                    preg_match('/^(\d+)/', $migrationName, $matches);
+                    $version = isset($matches[1]) ? (int)$matches[1] : 0;
+
+                    $stmt = $db->prepare("INSERT INTO migrations (version, filename) VALUES (?, ?)");
+                    $stmt->bind_param('is', $version, $migrationName);
                     $stmt->execute();
 
                     $results['executed'][] = $migrationName;
@@ -1114,7 +1303,7 @@ class DeployController extends Controller
         $this->log('Utilisateur: ' . Auth::user()['email']);
 
         try {
-            $db = \Core\Database::getInstance()->getConnection();
+            $db = \Core\Database::getConnection();
             $db->query("DROP TABLE IF EXISTS migrations");
             $this->createMigrationsTable();
 
@@ -1130,6 +1319,61 @@ class DeployController extends Controller
                 'success' => false,
                 'error' => $e->getMessage()
             ], 400);
+        }
+    }
+
+    /**
+     * Ajoute une branche personnalisée
+     */
+    public function addCustomBranch()
+    {
+        $branchName = $_POST['branch_name'] ?? null;
+        $description = $_POST['description'] ?? '';
+
+        if (!$branchName) {
+            View::json(['success' => false, 'error' => 'Nom de branche requis'], 400);
+            return;
+        }
+
+        // Valider le nom de branche (caractères alphanumériques, tirets, underscores, slashes)
+        if (!preg_match('/^[a-zA-Z0-9\/_-]+$/', $branchName)) {
+            View::json(['success' => false, 'error' => 'Nom de branche invalide'], 400);
+            return;
+        }
+
+        try {
+            $customBranchModel = new \Models\CustomBranch();
+            $result = $customBranchModel->addBranch($branchName, $description, Auth::id());
+            View::json($result);
+        } catch (\Exception $e) {
+            View::json([
+                'success' => false,
+                'error' => 'La table custom_branches n\'existe pas. Veuillez exécuter la migration 008.'
+            ], 500);
+        }
+    }
+
+    /**
+     * Supprime une branche personnalisée
+     */
+    public function deleteCustomBranch()
+    {
+        $branchId = $_POST['branch_id'] ?? null;
+
+        if (!$branchId) {
+            View::json(['success' => false, 'error' => 'ID de branche requis'], 400);
+            return;
+        }
+
+        try {
+            $customBranchModel = new \Models\CustomBranch();
+            $result = $customBranchModel->deleteBranch($branchId);
+            View::json($result);
+        } catch (\Exception $e) {
+            View::json([
+                'success' => false,
+                'error' => 'La table custom_branches n\'existe pas. Veuillez exécuter la migration 008.'
+            ], 500);
         }
     }
 }

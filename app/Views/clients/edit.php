@@ -40,35 +40,27 @@
             <h2>👤 Contact principal</h2>
         </div>
         <div class="card-body">
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="contact_first_name">Prénom *</label>
-                    <input type="text" id="contact_first_name" name="contact_first_name"
-                           value="<?= htmlspecialchars($client['contact_first_name']) ?>"
-                           required class="form-control">
-                </div>
-
-                <div class="form-group">
-                    <label for="contact_last_name">Nom *</label>
-                    <input type="text" id="contact_last_name" name="contact_last_name"
-                           value="<?= htmlspecialchars($client['contact_last_name']) ?>"
-                           required class="form-control">
-                </div>
+            <div class="form-group">
+                <label for="contact_name">Nom du contact *</label>
+                <input type="text" id="contact_name" name="contact_name"
+                       value="<?= htmlspecialchars($client['contact_name']) ?>"
+                       required class="form-control"
+                       placeholder="Prénom NOM">
             </div>
 
             <div class="form-row">
                 <div class="form-group">
-                    <label for="contact_email">Email *</label>
-                    <input type="email" id="contact_email" name="contact_email"
-                           value="<?= htmlspecialchars($client['contact_email']) ?>"
+                    <label for="email">Email *</label>
+                    <input type="email" id="email" name="email"
+                           value="<?= htmlspecialchars($client['email']) ?>"
                            required class="form-control">
                 </div>
 
                 <div class="form-group">
-                    <label for="contact_phone">Téléphone *</label>
-                    <input type="tel" id="contact_phone" name="contact_phone"
-                           value="<?= htmlspecialchars($client['contact_phone']) ?>"
-                           required class="form-control"
+                    <label for="phone">Téléphone</label>
+                    <input type="tel" id="phone" name="phone"
+                           value="<?= htmlspecialchars($client['phone'] ?? '') ?>"
+                           class="form-control"
                            placeholder="01 23 45 67 89">
                 </div>
             </div>

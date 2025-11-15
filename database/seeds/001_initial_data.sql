@@ -19,6 +19,7 @@ INSERT INTO `roles` (`id`, `name`, `label`, `permissions`) VALUES
     "reports": {"create": true, "read": true, "update": true, "delete": true, "download": true},
     "messages": {"create": true, "read": true, "update": true, "delete": true},
     "diagnostics": {"create": true, "read": true, "update": true, "delete": true},
+    "cessions": {"create": true, "read": true, "update": true, "delete": true, "validate": true},
     "map": {"read": true, "export": true},
     "appointments": {"create": true, "read": true, "update": true, "delete": true},
     "settings": {"read": true, "update": true},
@@ -33,6 +34,7 @@ INSERT INTO `roles` (`id`, `name`, `label`, `permissions`) VALUES
     "reports": {"create": true, "read": true, "download": true},
     "messages": {"create": true, "read": true, "update": false, "delete": false},
     "diagnostics": {"read": true, "update": false},
+    "cessions": {"create": true, "read": true, "update": true, "delete": false, "validate": false},
     "map": {"read": true},
     "appointments": {"create": true, "read": true, "update": true, "delete": true},
     "exports": {"orders": true, "interventions": true}
@@ -43,6 +45,7 @@ INSERT INTO `roles` (`id`, `name`, `label`, `permissions`) VALUES
     "reports": {"create": true, "read": "assigned", "download": "assigned", "upload_excel": true},
     "messages": {"create": true, "read": "assigned"},
     "diagnostics": {"read": "assigned"},
+    "cessions": {"read": false},
     "map": {"read": true},
     "appointments": {"read": "assigned", "update": "assigned"}
 }'),
@@ -52,6 +55,7 @@ INSERT INTO `roles` (`id`, `name`, `label`, `permissions`) VALUES
     "messages": {"create": true, "read": "own"},
     "diagnostics": {"read": "own"},
     "sites": {"read": "own"},
+    "cessions": {"read": "own"},
     "map": {"read": "own"},
     "appointments": {"read": "own"}
 }');

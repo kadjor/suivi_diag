@@ -14,7 +14,7 @@ class RBAC
      * Vérifie si un rôle a une permission donnée
      *
      * @param int $roleId ID du rôle
-     * @param string $permission Permission à vérifier (format: "resource.action" ex: "orders.create")
+     * @param string $permission Permission à vérifier (format: "resource.action" ou "simple_permission")
      * @return bool
      */
     public function hasPermission($roleId, $permission)
@@ -29,20 +29,28 @@ class RBAC
         $permissions = json_decode($role['permissions'], true);
 
         if (!$permissions) {
-            return false;
+            // Si pas de permissions JSON, utiliser config/settings.php
+            $rolePermissions = config("settings.role_permissions.{$role['name']}", []);
+            return in_array($permission, $rolePermissions);
         }
 
         // Parser la permission (ex: "orders.create" -> resource: orders, action: create)
         $parts = explode('.', $permission);
 
-        if (count($parts) !== 2) {
-            return false;
+        if (count($parts) === 2) {
+            // Format avec point (ex: "orders.create")
+            list($resource, $action) = $parts;
+
+            // Vérifier si la permission existe
+            if (isset($permissions[$resource][$action])) {
+                return $permissions[$resource][$action] === true;
+            }
         }
 
-        list($resource, $action) = $parts;
-
-        // Vérifier si la permission existe et est à true
-        return isset($permissions[$resource][$action]) && $permissions[$resource][$action] === true;
+        // Format simple (ex: "create_orders", "manage_settings")
+        // Fallback vers config/settings.php
+        $rolePermissions = config("settings.role_permissions.{$role['name']}", []);
+        return in_array($permission, $rolePermissions);
     }
 
     /**

@@ -9,6 +9,10 @@ Options -Indexes
     # RewriteCond %{HTTPS} off
     # RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
+    # Forcer le routing de /reports vers le contrôleur (même si le répertoire existe)
+    RewriteRule ^reports/?$ index.php/reports [L,QSA]
+    RewriteRule ^reports/(.*)$ index.php/reports/$1 [L,QSA]
+
     # Redirection des requêtes vers index.php
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d

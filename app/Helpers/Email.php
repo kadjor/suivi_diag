@@ -173,7 +173,7 @@ class Email
      */
     private static function getSecretariatEmails()
     {
-        $db = \Core\Database::getInstance()->getConnection();
+        $db = \Core\Database::getConnection();
 
         $sql = "SELECT email FROM users
                 WHERE role_id = (SELECT id FROM roles WHERE name = 'secretariat' LIMIT 1)

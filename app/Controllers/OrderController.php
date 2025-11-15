@@ -97,12 +97,21 @@ class OrderController extends Controller
             View::redirect('/orders');
         }
 
+        $user = Auth::user();
         $clientModel = new Client();
         $diagnosticTypeModel = new \Models\DiagnosticType();
 
+        // Si l'utilisateur est un client, récupérer ses infos
+        $currentClient = null;
+        if ($user['role_name'] === 'client') {
+            $currentClient = $clientModel->find($user['client_id']);
+        }
+
         View::render('orders.create', [
             'clients' => $clientModel->getAll(),
-            'diagnostic_types' => $diagnosticTypeModel->getActive()
+            'diagnostic_types' => $diagnosticTypeModel->getActive(),
+            'current_client' => $currentClient,
+            'is_client' => $user['role_name'] === 'client'
         ]);
     }
 
@@ -117,8 +126,15 @@ class OrderController extends Controller
         }
 
         try {
-            // Récupérer et valider les données
-            $clientId = $_POST['client_id'] ?? null;
+            $user = Auth::user();
+
+            // Pour les clients, utiliser automatiquement leur client_id
+            if ($user['role_name'] === 'client') {
+                $clientId = $user['client_id'];
+            } else {
+                $clientId = $_POST['client_id'] ?? null;
+            }
+
             $siteId = $_POST['site_id'] ?? null;
             $numeroLot = $_POST['numero_lot'] ?? null;
             $diagnosticTypeIds = $_POST['diagnostic_types'] ?? [];

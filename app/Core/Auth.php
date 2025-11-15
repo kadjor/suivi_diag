@@ -41,6 +41,20 @@ class Auth
     }
 
     /**
+     * Rafraîchit les données utilisateur depuis la base
+     * Utile après modification des permissions
+     */
+    public static function refreshUser()
+    {
+        if (!self::check()) {
+            return false;
+        }
+
+        unset($_SESSION['user_data']);
+        return self::user();
+    }
+
+    /**
      * Récupère l'ID de l'utilisateur connecté
      */
     public static function id()
