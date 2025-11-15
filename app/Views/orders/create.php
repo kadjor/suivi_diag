@@ -9,33 +9,60 @@
         <div class="form-section">
             <h2>👤 Informations Client</h2>
 
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="client_id">Client <span class="required">*</span></label>
-                    <select name="client_id" id="client_id" class="form-control" required>
-                        <option value="">-- Sélectionner un client --</option>
-                        <?php foreach ($clients ?? [] as $client): ?>
-                            <option value="<?= $client['id'] ?>"
-                                    data-email="<?= htmlspecialchars($client['email'] ?? '') ?>"
-                                    data-phone="<?= htmlspecialchars($client['phone'] ?? '') ?>">
-                                <?= htmlspecialchars($client['organization_name']) ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
+            <?php if ($is_client ?? false): ?>
+                <!-- Affichage simplifié pour les clients -->
+                <div class="client-info-display">
+                    <div class="info-card">
+                        <div class="info-row">
+                            <strong>🏢 Organisation:</strong>
+                            <span><?= htmlspecialchars($current_client['organization_name'] ?? 'N/A') ?></span>
+                        </div>
+                        <div class="info-row">
+                            <strong>📧 Email:</strong>
+                            <span><?= htmlspecialchars($current_client['email'] ?? 'N/A') ?></span>
+                        </div>
+                        <div class="info-row">
+                            <strong>📞 Téléphone:</strong>
+                            <span><?= htmlspecialchars($current_client['phone'] ?? 'N/A') ?></span>
+                        </div>
+                        <div class="info-row">
+                            <strong>📍 Adresse:</strong>
+                            <span><?= htmlspecialchars($current_client['address'] ?? 'N/A') ?>, <?= htmlspecialchars($current_client['postal_code'] ?? '') ?> <?= htmlspecialchars($current_client['city'] ?? '') ?></span>
+                        </div>
+                    </div>
+                    <input type="hidden" name="client_id" value="<?= $current_client['id'] ?>">
+                    <input type="hidden" id="client_id" value="<?= $current_client['id'] ?>">
+                </div>
+            <?php else: ?>
+                <!-- Sélection de client pour les administrateurs/secrétariat -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="client_id">Client <span class="required">*</span></label>
+                        <select name="client_id" id="client_id" class="form-control" required>
+                            <option value="">-- Sélectionner un client --</option>
+                            <?php foreach ($clients ?? [] as $client): ?>
+                                <option value="<?= $client['id'] ?>"
+                                        data-email="<?= htmlspecialchars($client['email'] ?? '') ?>"
+                                        data-phone="<?= htmlspecialchars($client['phone'] ?? '') ?>">
+                                    <?= htmlspecialchars($client['organization_name']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Email client</label>
+                        <input type="text" id="client_email_display" class="form-control" readonly disabled>
+                    </div>
                 </div>
 
-                <div class="form-group">
-                    <label>Email client</label>
-                    <input type="text" id="client_email_display" class="form-control" readonly disabled>
+                <div id="clientInfo" class="client-info" style="display: none;">
+                    <div class="info-box">
+                        <strong>📧 Email:</strong> <span id="client_email_text"></span> &nbsp;&nbsp;
+                        <strong>📞 Téléphone:</strong> <span id="client_phone_text"></span>
+                    </div>
                 </div>
-            </div>
-
-            <div id="clientInfo" class="client-info" style="display: none;">
-                <div class="info-box">
-                    <strong>📧 Email:</strong> <span id="client_email_text"></span> &nbsp;&nbsp;
-                    <strong>📞 Téléphone:</strong> <span id="client_phone_text"></span>
-                </div>
-            </div>
+            <?php endif; ?>
         </div>
 
         <!-- Section 2: Recherche patrimoine (numéro de lot) -->
@@ -282,6 +309,40 @@
     padding: 15px;
     border-radius: 4px;
     border-left: 4px solid #27ae60;
+}
+
+.client-info-display {
+    margin-bottom: 20px;
+}
+
+.info-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.info-row {
+    display: flex;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.info-row:last-child {
+    border-bottom: none;
+}
+
+.info-row strong {
+    min-width: 140px;
+    font-weight: 600;
+    opacity: 0.9;
+}
+
+.info-row span {
+    flex: 1;
+    font-size: 15px;
 }
 
 .autocomplete-results {
